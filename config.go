@@ -1,0 +1,8 @@
+package nctst
+
+const (
+	KCP_DATA_BUF_SIZE = 1024 * 128
+
+	KCP_UDP_RECEIVE_BUF_NUM = 128
+	KCP_UDP_SEND_BUF_NUM    = 128
+)

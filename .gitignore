@@ -1,0 +1,8 @@
+
+cmd/.DS_Store
+cmd/client/.DS_Store
+cmd/client/client
+cmd/client/flog.txt
+cmd/server/.DS_Store
+cmd/server/flog.txt
+cmd/server/server
