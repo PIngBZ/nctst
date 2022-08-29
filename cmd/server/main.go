@@ -74,13 +74,13 @@ func newOuterConn(conn *net.TCPConn) {
 
 	conn.SetDeadline(time.Time{})
 
-	outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, duplicater.Output)
-
 	if tunnel, ok := tunnels[int(tunnelID)]; ok {
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.SendChan)
 		tunnel.Add(int(connID), outerconn)
 	} else {
 		tunnel = nctst.NewOuterTunnel(int(tunnelID), duplicater.Output)
 		tunnels[int(tunnelID)] = tunnel
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.SendChan)
 		tunnel.Add(int(connID), outerconn)
 	}
 }

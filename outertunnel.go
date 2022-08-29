@@ -8,13 +8,17 @@ type OuterTunnel struct {
 	Ping  int
 	Speed int
 
-	commandChan chan *BufItem
 	connections sync.Map
+
+	SendChan chan *BufItem
 }
 
 func NewOuterTunnel(id int, sendChan chan *BufItem) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
+	h.SendChan = make(chan *BufItem, 8)
+
+	go h.daemon(sendChan)
 
 	return h
 }
@@ -30,8 +34,11 @@ func (h *OuterTunnel) Remove(id int) {
 	}
 }
 
-func (h *OuterTunnel) daemon() {
-	for {
-
+func (h *OuterTunnel) daemon(sendChan chan *BufItem) {
+	for buf := range sendChan {
+		select {
+		case h.SendChan <- buf:
+		default:
+		}
 	}
 }

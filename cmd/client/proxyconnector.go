@@ -95,7 +95,7 @@ func (h *ProxyConnector) connect() {
 	}
 
 	conn.SetDeadline(time.Time{})
-	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.sendChan)
+	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.SendChan)
 	h.tunnel.Add(h.ID, h.outer)
 }
 
