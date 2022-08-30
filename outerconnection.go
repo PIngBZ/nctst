@@ -67,12 +67,13 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 			return
 		}
 
-		if l > KCP_DATA_BUF_SIZE+uint32(Cmd_max) {
+		if l > KCP_DATA_BUF_SIZE+1 {
 			log.Printf("%s error len %d\n", h.Addr, l)
 			return
 		}
 
-		if l > KCP_DATA_BUF_SIZE {
+		isCommand := IsCommand(l)
+		if isCommand {
 			l, err = ReadUInt(h.conn)
 			if err != nil {
 				log.Printf("%s %+v\n", h.Addr, err)
@@ -91,7 +92,7 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 			return
 		}
 
-		if l > KCP_DATA_BUF_SIZE {
+		if isCommand {
 			select {
 			case CommandReceiveChan <- buf:
 			case <-h.Die:

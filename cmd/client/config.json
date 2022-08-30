@@ -5,5 +5,5 @@
     "proxies": ["127.0.0.1:8889"],
     "connperproxy": 5,
     "key": "123",
-    "duplicate": 1
+    "duplicate": 2
 }

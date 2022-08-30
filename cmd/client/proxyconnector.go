@@ -15,7 +15,6 @@ type ProxyConnector struct {
 
 	tunnel      *nctst.OuterTunnel
 	receiveChan chan *nctst.BufItem
-	sendChan    chan *nctst.BufItem
 
 	outer *nctst.OuterConnection
 
@@ -23,14 +22,13 @@ type ProxyConnector struct {
 	dieOnce sync.Once
 }
 
-func NewProxyConnector(id int, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem, sendChan chan *nctst.BufItem) *ProxyConnector {
+func NewProxyConnector(id int, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
 	h := &ProxyConnector{}
 	h.ID = id
 	h.Address = addr
 
 	h.tunnel = tunnel
 	h.receiveChan = receiveChan
-	h.sendChan = sendChan
 
 	h.die = make(chan struct{})
 
@@ -95,7 +93,7 @@ func (h *ProxyConnector) connect() {
 	}
 
 	conn.SetDeadline(time.Time{})
-	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.SendChan)
+	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.OutputChan)
 	h.tunnel.Add(h.ID, h.outer)
 }
 
@@ -105,7 +103,7 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	cmd.ConnID = h.ID
 	cmd.Duplicate = config.Duplicate
 	cmd.Key = config.Key
-	return nctst.SendCommand(conn, nctst.Cmd_handshake, cmd)
+	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }
 
 func (h *ProxyConnector) daemon() {

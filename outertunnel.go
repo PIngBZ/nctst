@@ -1,6 +1,11 @@
 package nctst
 
-import "sync"
+import (
+	"sync"
+	"time"
+
+	"sync/atomic"
+)
 
 type OuterTunnel struct {
 	ID int
@@ -8,19 +13,27 @@ type OuterTunnel struct {
 	Ping  int
 	Speed int
 
+	alive       atomic.Bool
 	connections sync.Map
 
-	SendChan chan *BufItem
+	OutputChan chan *BufItem
 }
 
-func NewOuterTunnel(id int, sendChan chan *BufItem) *OuterTunnel {
+func NewOuterTunnel(id int) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
-	h.SendChan = make(chan *BufItem, 8)
-
-	go h.daemon(sendChan)
+	h.OutputChan = make(chan *BufItem, 8)
+	h.alive.Store(true)
 
 	return h
+}
+
+func (h *OuterTunnel) Run() {
+	go h.daemon()
+}
+
+func (h *OuterTunnel) IsAlive() bool {
+	return h.alive.Load()
 }
 
 func (h *OuterTunnel) Add(id int, outerConn *OuterConnection) {
@@ -34,11 +47,28 @@ func (h *OuterTunnel) Remove(id int) {
 	}
 }
 
-func (h *OuterTunnel) daemon(sendChan chan *BufItem) {
-	for buf := range sendChan {
+func (h *OuterTunnel) TrySend(buf *BufItem) bool {
+	select {
+	case h.OutputChan <- buf:
+		h.alive.Store(true)
+		return true
+	default:
+		h.alive.Store(false)
+		return false
+	}
+}
+
+func (h *OuterTunnel) daemon() {
+	for {
+		ticker := time.NewTicker(time.Second * 5)
 		select {
-		case h.SendChan <- buf:
-		default:
+		case <-ticker.C:
+			h.ping()
 		}
 	}
+}
+
+func (h *OuterTunnel) ping() {
+	//cmd := &CommandPing{}
+
 }

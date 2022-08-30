@@ -3,14 +3,16 @@ package nctst
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 var (
-	CommandReceiveChan = make(chan *BufItem, 32)
+	CommandReceiveChan = make(chan *BufItem, 8)
 
-	commandPublishObservers = make([]chan Command, 0)
+	commandPublishObservers = make([]chan *Command, 0)
 	commandPublishLocker    = sync.Mutex{}
 )
 
@@ -20,37 +22,67 @@ const (
 	_ CommandType = iota
 
 	Cmd_handshake
+	Cmd_ping
 
 	Cmd_max
 )
 
-func AttachObserver(observer chan Command) {
+func AttachObserver(observer chan *Command) {
 	commandPublishLocker.Lock()
 	defer commandPublishLocker.Unlock()
 
 	commandPublishObservers = append(commandPublishObservers, observer)
 }
 
-func CommandDaemon() {
-	for {
-		select {
-		case <-CommandReceiveChan:
+func RemoveObserver(observer chan *Command) {
+	commandPublishLocker.Lock()
+	defer commandPublishLocker.Unlock()
+
+	for idx, item := range commandPublishObservers {
+		if item == observer {
+			commandPublishObservers = append(commandPublishObservers[:idx], commandPublishObservers[idx+1:]...)
+			return
 		}
 	}
 }
 
-func SendCommand[T any](conn *net.TCPConn, t CommandType, command *T) error {
-	js, err := ToJson(command)
+func CommandDaemon() {
+	for buf := range CommandReceiveChan {
+		if cmd, err := CommandFromBuf(buf); err == nil {
+			publishCommand(cmd)
+		}
+		buf.Release()
+	}
+}
+
+func publishCommand(cmd *Command) {
+	commandPublishLocker.Lock()
+	defer commandPublishLocker.Unlock()
+
+	for _, observer := range commandPublishObservers {
+		select {
+		case observer <- cmd:
+		default:
+		}
+	}
+}
+
+func SendCommand(conn *net.TCPConn, command *Command) error {
+	js, err := ToJson(command.Item)
 	if err != nil {
 		return err
 	}
 	data := []byte(js)
 
-	if err := WriteUInt(conn, KCP_DATA_BUF_SIZE+uint32(t)); err != nil {
+	if err := WriteUInt(conn, KCP_DATA_BUF_SIZE+1); err != nil {
 		return err
 	}
 
-	if err := WriteUInt(conn, uint32(len(data))); err != nil {
+	if err := WriteUInt(conn, uint32(len(data))+4); err != nil {
+		return err
+	}
+
+	if err := WriteUInt(conn, uint32(command.Type)); err != nil {
 		return err
 	}
 
@@ -61,40 +93,48 @@ func SendCommand[T any](conn *net.TCPConn, t CommandType, command *T) error {
 	return nil
 }
 
-func ReadCommandType(conn *net.TCPConn) (CommandType, error) {
-	n, err := ReadUInt(conn)
-	if err != nil {
-		return 0, err
-	}
-
-	if n <= KCP_DATA_BUF_SIZE || n > uint32(KCP_DATA_BUF_SIZE+Cmd_max) {
-		return 0, fmt.Errorf("err type: %d", n)
-	}
-
-	return CommandType(n - KCP_DATA_BUF_SIZE), nil
+func IsCommand(n uint32) bool {
+	return n == KCP_DATA_BUF_SIZE+1
 }
 
-func ReadCommand[T any](conn *net.TCPConn) (*T, error) {
-	s, err := ReadLString(conn)
-	if err != nil {
-		return nil, err
-	}
-
-	var obj T
-	if err := json.Unmarshal([]byte(s), &obj); err != nil {
-		return nil, err
-	}
-	return &obj, nil
-}
-
-func CommandFromBuf[T any](buf *BufItem) (*T, error) {
+func CommandFromBuf(buf *BufItem) (*Command, error) {
+	t, _ := ReadUInt(buf)
 	s := string(buf.Data())
 
-	var obj T
-	if err := json.Unmarshal([]byte(s), &obj); err != nil {
+	var obj interface{}
+	switch CommandType(t) {
+	case Cmd_handshake:
+		obj = &CommandHandshake{}
+	default:
+		return nil, fmt.Errorf("CommandFromBuf error type: %d", t)
+	}
+
+	if err := json.Unmarshal([]byte(s), obj); err != nil {
 		return nil, err
 	}
-	return &obj, nil
+	return &Command{Type: CommandType(t), Item: obj}, nil
+}
+
+func ReadCommand(reader io.Reader) (*Command, error) {
+	l, err := ReadUInt(reader)
+	if err != nil {
+		return nil, fmt.Errorf("ReadCommand read len err: %+v", err)
+	}
+
+	if l > 1024 {
+		return nil, fmt.Errorf("ReadCommand cmd len err: %d", l)
+	}
+
+	buf := DataBufPool.Get()
+	if _, err = buf.ReadNFromReader(reader, int(l)); err != nil {
+		buf.Release()
+		return nil, fmt.Errorf("ReadCommand ReadNFromReader err: %+v", err)
+	}
+
+	command, err := CommandFromBuf(buf)
+	buf.Release()
+
+	return command, err
 }
 
 type Command struct {
@@ -107,4 +147,11 @@ type CommandHandshake struct {
 	ConnID    int
 	Duplicate int
 	Key       string
+}
+
+type CommandPing struct {
+	PingID   int
+	PingStep int
+	TunnelID int
+	Time     time.Duration
 }

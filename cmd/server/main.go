@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/dearzhp/nctst"
@@ -18,7 +19,7 @@ var (
 	k          = nctst.NewKcp(10001)
 	smuxServer *smux.Session
 	duplicater *nctst.Duplicater
-	tunnels    = make(map[int]*nctst.OuterTunnel)
+	tunnels    = &sync.Map{}
 )
 
 func init() {
@@ -47,7 +48,7 @@ func main() {
 	nctst.CheckError(err)
 	smuxServer = smux
 
-	duplicater = nctst.NewDuplicater(1, k.OutputChan)
+	duplicater = nctst.NewDuplicater(1, k.OutputChan, tunnels)
 
 	go smuxLoop()
 
@@ -74,34 +75,47 @@ func newOuterConn(conn *net.TCPConn) {
 
 	conn.SetDeadline(time.Time{})
 
-	if tunnel, ok := tunnels[int(tunnelID)]; ok {
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.SendChan)
+	if tunnel_i, ok := tunnels.Load(int(tunnelID)); ok {
+		tunnel := tunnel_i.(*nctst.OuterTunnel)
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan)
 		tunnel.Add(int(connID), outerconn)
 	} else {
-		tunnel = nctst.NewOuterTunnel(int(tunnelID), duplicater.Output)
-		tunnels[int(tunnelID)] = tunnel
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.SendChan)
+		tunnel := nctst.NewOuterTunnel(int(tunnelID))
+		if tunnel_i, ok := tunnels.LoadOrStore(int(tunnelID), tunnel); ok {
+			tunnel = tunnel_i.(*nctst.OuterTunnel)
+		} else {
+			tunnel.Run()
+		}
+
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan)
 		tunnel.Add(int(connID), outerconn)
 	}
 }
 
 func checkInitCommand(conn *net.TCPConn) (int, int, error) {
-	if t, err := nctst.ReadCommandType(conn); err != nil {
-		return 0, 0, err
-	} else if t != nctst.Cmd_handshake {
-		return 0, 0, fmt.Errorf("checkInitCommand err type: %d", t)
+	if t, err := nctst.ReadUInt(conn); err != nil {
+		return 0, 0, fmt.Errorf("checkInitCommand ReadHeader err: %+v", err)
+	} else if !nctst.IsCommand(t) {
+		return 0, 0, fmt.Errorf("checkInitCommand not command: %d", t)
 	}
 
-	cmd, err := nctst.ReadCommand[nctst.CommandHandshake](conn)
+	command, err := nctst.ReadCommand(conn)
 	if err != nil {
-		return 0, 0, err
+		return 0, 0, fmt.Errorf("checkInitCommand ReadCommand err: %+v", err)
 	}
 
+	if command.Type != nctst.Cmd_handshake {
+		return 0, 0, fmt.Errorf("checkInitCommand cmd type err: %d", command.Type)
+	}
+
+	cmd := command.Item.(*nctst.CommandHandshake)
+
+	log.Printf("key: %s", cmd.Key)
 	if cmd.Key != config.Key {
 		return 0, 0, errors.New("error key: " + cmd.Key)
 	}
 
-	duplicater.SetNum(nctst.Min(len(tunnels), nctst.Max(cmd.Duplicate, 1)))
+	duplicater.SetNum(cmd.Duplicate)
 
 	return cmd.TunnelID, cmd.ConnID, nil
 }
