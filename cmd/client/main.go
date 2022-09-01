@@ -48,6 +48,7 @@ func main() {
 	duplicater = nctst.NewDuplicater(config.Duplicate, k.OutputChan, tunnels)
 	duplicater.SetNum(config.Duplicate)
 
+	go nctst.CommandDaemon()
 	startUpstreamProxies()
 
 	for {

@@ -1,9 +1,14 @@
 
 <h3>简单用法：</h3>
 
-ssh client ---> nctst client ------------ nctst serber ---> ssh server
+ssh client ---> nctst client port -------------- nctst server ---> ssh server port
+
+相当于一个通道，中间通过多个路线并发和容灾保证连接持续性。
 
 <h3>复杂用法：</h3>
+
+nctst服务端后边放一个socks5服务，就可以连接任何东西了，再借助路由上配置的iptables规则和redsocks工具转发就可以实现网段内透明连接机房任何服务
+
 <img src="image.png" alt="nctst"/> 
 
 ## Introduction

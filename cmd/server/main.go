@@ -51,6 +51,7 @@ func main() {
 	duplicater = nctst.NewDuplicater(1, k.OutputChan, tunnels)
 
 	go smuxLoop()
+	go nctst.CommandDaemon()
 
 	for {
 		conn, err := listener.AcceptTCP()
