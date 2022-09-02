@@ -37,8 +37,8 @@ func OpenLog() {
 
 func SmuxConfig() *smux.Config {
 	smuxConfig := smux.DefaultConfig()
-	smuxConfig.Version = 2
-	smuxConfig.MaxFrameSize = 1024 * 2
+	smuxConfig.Version = 1
+	smuxConfig.MaxFrameSize = 512
 	smuxConfig.MaxReceiveBuffer = 1024 * 1024 * 8
 	smuxConfig.KeepAliveInterval = time.Second * 30
 	smuxConfig.KeepAliveTimeout = time.Hour * 24 * 30

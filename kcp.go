@@ -35,12 +35,12 @@ func NewKcp(connID uint) *Kcp {
 	h := &Kcp{}
 
 	h.fakeAddr, _ = net.ResolveUDPAddr("udp", "127.0.0.1:1234")
-	h.session, _ = kcpgo.NewConn3(10001, h.fakeAddr, nil, 10, 3, h)
+	h.session, _ = kcpgo.NewConn3(10001, h.fakeAddr, nil, 0, 0, h)
 
 	h.session.SetStreamMode(true)
 	h.session.SetWriteDelay(false)
 	h.session.SetNoDelay(1, 10, 8, 1)
-	h.session.SetWindowSize(1024, 1024)
+	h.session.SetWindowSize(64, 64)
 	h.session.SetMtu(1024 * 8)
 	h.session.SetACKNoDelay(true)
 

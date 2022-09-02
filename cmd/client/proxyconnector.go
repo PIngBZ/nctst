@@ -1,68 +1,42 @@
 package main
 
 import (
+	"log"
 	"net"
-	"sync"
 	"time"
 
-	"github.com/dearzhp/nctst"
+	"github.com/PIngBZ/nctst"
 	"github.com/haochen233/socks5"
 )
 
 type ProxyConnector struct {
 	ID      int
+	ProxyID int
 	Address string
 
 	tunnel      *nctst.OuterTunnel
 	receiveChan chan *nctst.BufItem
 
 	outer *nctst.OuterConnection
-
-	die     chan struct{}
-	dieOnce sync.Once
 }
 
-func NewProxyConnector(id int, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
+func NewProxyConnector(id int, proxyID int, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
 	h := &ProxyConnector{}
 	h.ID = id
+	h.ProxyID = proxyID
 	h.Address = addr
 
 	h.tunnel = tunnel
 	h.receiveChan = receiveChan
 
-	h.die = make(chan struct{})
-
 	go h.daemon()
 
+	log.Printf("ProxyConnector created %d %d", proxyID, id)
 	return h
 }
 
-func (h *ProxyConnector) Close() {
-	var once bool
-	h.dieOnce.Do(func() {
-		close(h.die)
-		once = true
-	})
-
-	if !once {
-		return
-	}
-
-	if h.outer != nil {
-		h.outer.Close()
-	}
-}
-
-func (h *ProxyConnector) IsClosed() bool {
-	select {
-	case <-h.die:
-		return true
-	default:
-	}
-	return false
-}
-
 func (h *ProxyConnector) connect() {
+	log.Printf("ProxyConnector connecting %d %d", h.ProxyID, h.ID)
 	client := socks5.Client{
 		ProxyAddr: h.Address,
 		Auth: map[socks5.METHOD]socks5.Authenticator{
@@ -71,10 +45,6 @@ func (h *ProxyConnector) connect() {
 	}
 	var conn *net.TCPConn
 	for {
-		if h.IsClosed() {
-			return
-		}
-
 		var err error
 		conn, err = client.Connect(socks5.Version5, config.ServerIP+":"+config.ServerPort)
 		if err != nil {
@@ -88,12 +58,9 @@ func (h *ProxyConnector) connect() {
 		break
 	}
 
-	if h.IsClosed() {
-		return
-	}
-
+	log.Printf("ProxyConnector connect success %d %d", h.ProxyID, h.ID)
 	conn.SetDeadline(time.Time{})
-	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.OutputChan)
+	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.OutputChan, h.tunnel.CommandSendChan)
 	h.tunnel.Add(h.ID, h.outer)
 }
 
@@ -107,22 +74,20 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 }
 
 func (h *ProxyConnector) daemon() {
-	h.reconnect()
+	h.connect()
 
 	for {
 		select {
-		case <-h.die:
-			return
 		case <-h.outer.Die:
+			h.tunnel.Remove(h.outer.ID)
 			h.reconnect()
 		}
 	}
 }
 
 func (h *ProxyConnector) reconnect() {
+	log.Printf("ProxyConnector waiting 5s to reconnect %d %d", h.ProxyID, h.ID)
 	select {
-	case <-h.die:
-		return
 	case <-time.After(time.Second * 5):
 		h.connect()
 	}

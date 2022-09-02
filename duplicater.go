@@ -27,15 +27,6 @@ func NewDuplicater(num int, sendChan chan *BufItem, tunnels *sync.Map) *Duplicat
 }
 
 func (h *Duplicater) SetNum(num int) {
-	total := 0
-	h.tunnels.Range(func(key, value any) bool {
-		if value.(*OuterTunnel).IsAlive() {
-			total += 1
-		}
-		return true
-	})
-
-	num = Max(Min(total, num), 1)
 	atomic.StoreInt32(&h.num, int32(num))
 	log.Printf("Duplicater SetNum: %d", num)
 }
@@ -45,18 +36,20 @@ func (h *Duplicater) GetNum() int {
 }
 
 func (h *Duplicater) daemon() {
-	var alives []*OuterTunnel
+	var conns []*OuterTunnel
+	var aliveNum int
+	ticker := time.NewTicker(time.Second)
 	for {
-		ticker := time.NewTicker(time.Second)
 
 		select {
 		case buf := <-h.sendChan:
-			if len(alives) == 0 {
+			if len(conns) == 0 {
 				buf.Release()
+				log.Println("no alive tunnel")
 				continue
 			}
 
-			num := Max(Min(int(atomic.LoadInt32(&h.num)), len(alives)), 1)
+			num := Max(Min(int(atomic.LoadInt32(&h.num)), aliveNum), 1)
 
 			var cp *BufItem
 			if num == 1 {
@@ -65,7 +58,7 @@ func (h *Duplicater) daemon() {
 			} else {
 				cp = buf.Copy()
 			}
-			for _, tunnel := range alives {
+			for _, tunnel := range conns {
 				if tunnel.TrySend(cp) {
 					cp = nil
 					num -= 1
@@ -90,17 +83,21 @@ func (h *Duplicater) daemon() {
 				cp.Release()
 			}
 		case <-ticker.C:
-			alives = make([]*OuterTunnel, 0)
+			conns = make([]*OuterTunnel, 0)
+			aliveNum = 0
 			h.tunnels.Range(func(key, value any) bool {
 				tunnel := value.(*OuterTunnel)
-				if tunnel.IsAlive() {
-					alives = append(alives, tunnel)
+				if !tunnel.IsAlive() {
+					tunnel.Ping = 1000000
+				} else {
+					aliveNum++
 				}
+				conns = append(conns, tunnel)
 				return true
 			})
 
-			sort.SliceStable(alives, func(i, j int) bool {
-				return alives[i].Ping < alives[j].Ping
+			sort.SliceStable(conns, func(i, j int) bool {
+				return conns[i].Ping < conns[j].Ping
 			})
 		}
 	}

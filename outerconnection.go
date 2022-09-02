@@ -15,11 +15,12 @@ type OuterConnection struct {
 	conn        *net.TCPConn
 	receiveChan chan *BufItem
 	sendChan    chan *BufItem
+	commandChan chan *Command
 
 	dieOnce sync.Once
 }
 
-func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan chan *BufItem, sendChan chan *BufItem) *OuterConnection {
+func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
 	h := &OuterConnection{}
 	h.TunnelID = tunnelID
 	h.ID = id
@@ -28,6 +29,7 @@ func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan cha
 	h.conn = conn
 	h.receiveChan = receiveChan
 	h.sendChan = sendChan
+	h.commandChan = commandChan
 
 	h.Die = make(chan struct{})
 
@@ -35,6 +37,7 @@ func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan cha
 	go h.receiveLoop(conn, once)
 	go h.sendLoop(conn, once)
 
+	log.Printf("OuterConnection created %d %d", tunnelID, id)
 	return h
 }
 
@@ -64,6 +67,11 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 		l, err := ReadUInt(h.conn)
 		if err != nil {
 			log.Printf("%s %+v\n", h.Addr, err)
+			return
+		}
+
+		if l == 0 {
+			log.Printf("receiveLoop read len 0, %s", h.Addr)
 			return
 		}
 
@@ -101,7 +109,6 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 			default:
 				buf.Release()
 			}
-			return
 		} else {
 			select {
 			case h.receiveChan <- buf:
@@ -117,11 +124,10 @@ func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
 	defer once.Do(h.Close)
 
 	for {
-		var buf *BufItem
 		select {
 		case <-h.Die:
 			return
-		case buf = <-h.sendChan:
+		case buf := <-h.sendChan:
 			if err := WriteUInt(conn, uint32(buf.Size())); err != nil {
 				buf.Release()
 				log.Printf("WriteUInt error: %s %+v\n", h.Addr, err)
@@ -131,6 +137,11 @@ func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
 			buf.Release()
 			if err != nil {
 				log.Printf("WriteUInt error: %s %+v\n", h.Addr, err)
+				return
+			}
+		case command := <-h.commandChan:
+			if err := SendCommand(conn, command); err != nil {
+				log.Printf("SendCommand error: %s %+v\n", h.Addr, err)
 				return
 			}
 		}

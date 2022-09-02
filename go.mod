@@ -1,4 +1,4 @@
-module github.com/dearzhp/nctst
+module github.com/PIngBZ/nctst
 
 go 1.18
 

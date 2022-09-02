@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
-	"time"
 )
 
 var (
@@ -27,14 +27,14 @@ const (
 	Cmd_max
 )
 
-func AttachObserver(observer chan *Command) {
+func AttachCommandObserver(observer chan *Command) {
 	commandPublishLocker.Lock()
 	defer commandPublishLocker.Unlock()
 
 	commandPublishObservers = append(commandPublishObservers, observer)
 }
 
-func RemoveObserver(observer chan *Command) {
+func RemoveCommandObserver(observer chan *Command) {
 	commandPublishLocker.Lock()
 	defer commandPublishLocker.Unlock()
 
@@ -50,6 +50,8 @@ func CommandDaemon() {
 	for buf := range CommandReceiveChan {
 		if cmd, err := CommandFromBuf(buf); err == nil {
 			publishCommand(cmd)
+		} else {
+			log.Printf("CommandDaemon CommandFromBuf error: %+v %d", err, buf.Size())
 		}
 		buf.Release()
 	}
@@ -69,6 +71,7 @@ func publishCommand(cmd *Command) {
 
 func SendCommand(conn *net.TCPConn, command *Command) error {
 	js, err := ToJson(command.Item)
+
 	if err != nil {
 		return err
 	}
@@ -105,6 +108,8 @@ func CommandFromBuf(buf *BufItem) (*Command, error) {
 	switch CommandType(t) {
 	case Cmd_handshake:
 		obj = &CommandHandshake{}
+	case Cmd_ping:
+		obj = &CommandPing{}
 	default:
 		return nil, fmt.Errorf("CommandFromBuf error type: %d", t)
 	}
@@ -150,8 +155,8 @@ type CommandHandshake struct {
 }
 
 type CommandPing struct {
-	PingID   int
-	PingStep int
 	TunnelID int
-	Time     time.Duration
+	ID       int
+	Step     int
+	SendTime int64
 }

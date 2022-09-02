@@ -1,6 +1,10 @@
 package main
 
-import "github.com/dearzhp/nctst"
+import (
+	"log"
+
+	"github.com/PIngBZ/nctst"
+)
 
 var (
 	proxies = []*Proxy{}
@@ -19,7 +23,8 @@ func NewProxy(id int, addr string, receiveChan chan *nctst.BufItem, tunnel *ncts
 
 	h.connectors = make(map[int]*ProxyConnector)
 	for i := 0; i < config.Connperproxy; i++ {
-		h.connectors[id] = NewProxyConnector(i, addr, tunnel, receiveChan)
+		h.connectors[id] = NewProxyConnector(i, id, addr, tunnel, receiveChan)
 	}
+	log.Printf("Proxy created %d", id)
 	return h
 }

@@ -1,14 +1,4 @@
 
-<h3>简单用法：</h3>
-
-ssh client ---> nctst client port -------------- nctst server ---> ssh server port
-
-相当于一个通道，中间通过多个路线并发和容灾保证连接持续性。
-
-<h3>复杂用法：</h3>
-
-nctst服务端后边放一个socks5服务，就可以连接任何东西了，再借助路由上配置的iptables规则和redsocks工具转发就可以实现网段内透明连接机房任何服务
-
 <img src="image.png" alt="nctst"/> 
 
 ## Introduction
@@ -22,7 +12,7 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 第一版，问题很多，忙，凑合先试试
 
-
+<h3>特性：</h3>
 1. 多路复用
 2. 负载均衡
 3. KCP
@@ -30,7 +20,7 @@ nctst是一个 TCP to TCP 点对点连接工具
 5. key认证通过才能连接
 
 
-后续计划支持：
+<h3>后续计划支持：</h3>
 1. 测速，选更快的路径
 2. UDP
 3. 监控dashboard
@@ -38,6 +28,19 @@ nctst是一个 TCP to TCP 点对点连接工具
 5. 服务端内置socks5
 
 ## Documentation
+
+
+<h3>简单用法：</h3>
+
+ssh client ---> nctst client port -------------- nctst server ---> ssh server port
+
+相当于一个通道，中间通过多个路线并发和容灾保证连接持续性。
+
+<h3>复杂用法：</h3>
+
+nctst服务端后边放一个socks5服务，就可以连接任何东西了，再借助路由上配置的iptables规则和redsocks工具转发就可以实现网段内透明连接机房任何服务
+
+
 
 server:
 ./server -c config.json

@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dearzhp/nctst"
+	"github.com/PIngBZ/nctst"
 	"github.com/xtaci/smux"
 )
 
@@ -78,7 +78,7 @@ func newOuterConn(conn *net.TCPConn) {
 
 	if tunnel_i, ok := tunnels.Load(int(tunnelID)); ok {
 		tunnel := tunnel_i.(*nctst.OuterTunnel)
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan)
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan, tunnel.CommandSendChan)
 		tunnel.Add(int(connID), outerconn)
 	} else {
 		tunnel := nctst.NewOuterTunnel(int(tunnelID))
@@ -88,7 +88,7 @@ func newOuterConn(conn *net.TCPConn) {
 			tunnel.Run()
 		}
 
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan)
+		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan, tunnel.CommandSendChan)
 		tunnel.Add(int(connID), outerconn)
 	}
 }
