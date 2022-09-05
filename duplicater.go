@@ -40,16 +40,10 @@ func (h *Duplicater) daemon() {
 	var aliveNum int
 	ticker := time.NewTicker(time.Second)
 	for {
-
 		select {
 		case buf := <-h.sendChan:
-			if len(conns) == 0 {
-				buf.Release()
-				log.Println("no alive tunnel")
-				continue
-			}
-
 			num := Max(Min(int(atomic.LoadInt32(&h.num)), aliveNum), 1)
+			sent := 0
 
 			var cp *BufItem
 			if num == 1 {
@@ -58,16 +52,16 @@ func (h *Duplicater) daemon() {
 			} else {
 				cp = buf.Copy()
 			}
+
 			for _, tunnel := range conns {
 				if tunnel.TrySend(cp) {
 					cp = nil
-					num -= 1
-
-					if num == 0 {
+					sent++
+					if sent == num {
 						break
 					}
 
-					if num == 1 {
+					if sent == num-1 {
 						cp = buf
 						buf = nil
 					} else {
@@ -76,12 +70,18 @@ func (h *Duplicater) daemon() {
 				}
 			}
 
+			if sent == 0 {
+				// wait send
+				cp = nil
+			}
+
 			if buf != nil {
 				buf.Release()
 			}
 			if cp != nil {
 				cp.Release()
 			}
+
 		case <-ticker.C:
 			conns = make([]*OuterTunnel, 0)
 			aliveNum = 0
