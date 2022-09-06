@@ -70,6 +70,7 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 		buf, err := ReadLBuf(conn)
 		if err != nil {
 			log.Printf("receiveLoop ReadLenBuf error %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
+			return
 		}
 
 		if IsCommand(buf) {
