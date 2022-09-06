@@ -3,14 +3,14 @@ package nctst
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"sync"
 )
 
 var (
-	CommandReceiveChan = make(chan *BufItem, 8)
+	CommandSignHeader  uint32 = 0xf1f121
+	CommandReceiveChan        = make(chan *BufItem, 8)
 
 	commandPublishObservers = make([]chan *Command, 0)
 	commandPublishLocker    = sync.Mutex{}
@@ -21,6 +21,10 @@ type CommandType uint32
 const (
 	_ CommandType = iota
 
+	Cmd_none
+
+	Cmd_login
+	Cmd_loginReply
 	Cmd_handshake
 	Cmd_ping
 
@@ -48,10 +52,10 @@ func RemoveCommandObserver(observer chan *Command) {
 
 func CommandDaemon() {
 	for buf := range CommandReceiveChan {
-		if cmd, err := CommandFromBuf(buf); err == nil {
+		if cmd, err := ReadCommand(buf); err == nil {
 			publishCommand(cmd)
 		} else {
-			log.Printf("CommandDaemon CommandFromBuf error: %+v %d", err, buf.Size())
+			log.Printf("CommandDaemon CommandFromBuf error: %+v %d\n", err, buf.Size())
 		}
 		buf.Release()
 	}
@@ -77,11 +81,11 @@ func SendCommand(conn *net.TCPConn, command *Command) error {
 	}
 	data := []byte(js)
 
-	if err := WriteUInt(conn, KCP_DATA_BUF_SIZE+1); err != nil {
+	if err := WriteUInt(conn, uint32(len(js)+8)); err != nil {
 		return err
 	}
 
-	if err := WriteUInt(conn, uint32(len(data))+4); err != nil {
+	if err := WriteUInt(conn, CommandSignHeader); err != nil {
 		return err
 	}
 
@@ -96,16 +100,46 @@ func SendCommand(conn *net.TCPConn, command *Command) error {
 	return nil
 }
 
-func IsCommand(n uint32) bool {
-	return n == KCP_DATA_BUF_SIZE+1
+func IsCommand(buf *BufItem) bool {
+	if buf.Size() < 16 {
+		return false
+	}
+	if ToUint(buf.Data()[:4]) != CommandSignHeader {
+		return false
+	}
+	if ToUint(buf.Data()[4:8]) >= uint32(Cmd_max) {
+		return false
+	}
+	return true
 }
 
-func CommandFromBuf(buf *BufItem) (*Command, error) {
+func GetCommandType(buf *BufItem) CommandType {
+	if !IsCommand(buf) {
+		return Cmd_none
+	}
+
+	t := ToUint(buf.Data()[4:8])
+
+	if t >= uint32(Cmd_max) {
+		return Cmd_none
+	}
+	return CommandType(t)
+}
+
+func ReadCommand(buf *BufItem) (*Command, error) {
+	if sign, _ := ReadUInt(buf); sign != CommandSignHeader {
+		return nil, fmt.Errorf("CommandSignHeader error %d", sign)
+	}
+
 	t, _ := ReadUInt(buf)
 	s := string(buf.Data())
 
 	var obj interface{}
 	switch CommandType(t) {
+	case Cmd_login:
+		obj = &CommandLogin{}
+	case Cmd_loginReply:
+		obj = &CommandLoginReply{}
 	case Cmd_handshake:
 		obj = &CommandHandshake{}
 	case Cmd_ping:
@@ -120,43 +154,36 @@ func CommandFromBuf(buf *BufItem) (*Command, error) {
 	return &Command{Type: CommandType(t), Item: obj}, nil
 }
 
-func ReadCommand(reader io.Reader) (*Command, error) {
-	l, err := ReadUInt(reader)
-	if err != nil {
-		return nil, fmt.Errorf("ReadCommand read len err: %+v", err)
-	}
-
-	if l > 1024 {
-		return nil, fmt.Errorf("ReadCommand cmd len err: %d", l)
-	}
-
-	buf := DataBufPool.Get()
-	if _, err = buf.ReadNFromReader(reader, int(l)); err != nil {
-		buf.Release()
-		return nil, fmt.Errorf("ReadCommand ReadNFromReader err: %+v", err)
-	}
-
-	command, err := CommandFromBuf(buf)
-	buf.Release()
-
-	return command, err
-}
-
 type Command struct {
 	Type CommandType
 	Item interface{}
 }
 
+type CommandLogin struct {
+	ClientUUID string
+	UserName   string
+	PassWord   string
+	Duplicate  int
+	Key        string
+}
+
+type CommandLoginReply struct {
+	ClientUUID string
+	ClientID   uint
+}
+
 type CommandHandshake struct {
-	TunnelID  int
-	ConnID    int
-	Duplicate int
-	Key       string
+	ClientUUID string
+	ClientID   uint
+	TunnelID   uint
+	ConnID     uint
+	Key        string
 }
 
 type CommandPing struct {
-	TunnelID int
-	ID       int
-	Step     int
+	ClientID uint
+	TunnelID uint
+	ID       uint
+	Step     uint
 	SendTime int64
 }

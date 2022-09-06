@@ -11,20 +11,20 @@ var (
 )
 
 type Proxy struct {
-	ID   int
+	ID   uint
 	Addr string
 
-	connectors map[int]*ProxyConnector
+	connectors map[uint]*ProxyConnector
 }
 
-func NewProxy(id int, addr string, receiveChan chan *nctst.BufItem, tunnel *nctst.OuterTunnel) *Proxy {
+func NewProxy(id uint, addr string, receiveChan chan *nctst.BufItem, tunnel *nctst.OuterTunnel) *Proxy {
 	h := &Proxy{}
 	h.ID = id
 
-	h.connectors = make(map[int]*ProxyConnector)
+	h.connectors = make(map[uint]*ProxyConnector)
 	for i := 0; i < config.Connperproxy; i++ {
-		h.connectors[id] = NewProxyConnector(i, id, addr, tunnel, receiveChan)
+		h.connectors[id] = NewProxyConnector(uint(i), id, addr, tunnel, receiveChan)
 	}
-	log.Printf("Proxy created %d", id)
+	log.Printf("proxy created %d\n", id)
 	return h
 }

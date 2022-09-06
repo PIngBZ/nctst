@@ -23,6 +23,8 @@ github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5a
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-cmp v0.4.0/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
+github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/haochen233/socks5 v1.0.0 h1:OSC4QGjKxdb7hznD7B6v7Lg5t0liq9YR29Qk9P2metM=
 github.com/haochen233/socks5 v1.0.0/go.mod h1:EoQMEeagQ7UP/h+jeFwDV+0Av7zb45iPN6ZWrDKexD0=
 github.com/klauspost/cpuid/v2 v2.0.14 h1:QRqdp6bb9M9S5yyKeYteXKuoKE4p0tGlra81fKOpWH8=

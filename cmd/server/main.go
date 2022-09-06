@@ -3,23 +3,22 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"log"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/xtaci/smux"
 )
 
 var (
 	configFile string
 	config     *Config
-	k          = nctst.NewKcp(10001)
-	smuxServer *smux.Session
-	duplicater *nctst.Duplicater
-	tunnels    = &sync.Map{}
+
+	clients            = make(map[string]*Client)
+	clientsLocker      = sync.Mutex{}
+	nextClientID  uint = uint(rand.Intn(89999) + 10000)
 )
 
 func init() {
@@ -35,6 +34,8 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
+
+	go nctst.CommandDaemon()
 }
 
 func main() {
@@ -44,15 +45,6 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	nctst.CheckError(err)
 
-	smux, err := smux.Server(nctst.NewCompStream(k), nctst.SmuxConfig())
-	nctst.CheckError(err)
-	smuxServer = smux
-
-	duplicater = nctst.NewDuplicater(1, k.OutputChan, tunnels)
-
-	go smuxLoop()
-	go nctst.CommandDaemon()
-
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -60,91 +52,90 @@ func main() {
 			continue
 		}
 
-		go newOuterConn(conn)
+		go onNewConnection(conn)
 	}
 }
 
-func newOuterConn(conn *net.TCPConn) {
-	tunnelID, connID, err := checkInitCommand(conn)
+func onNewConnection(conn *net.TCPConn) {
+	conn.SetDeadline(time.Now().Add(time.Second * 5))
+
+	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
-		log.Printf("checkHandshakeError %s %+v\n", conn.RemoteAddr().String(), err)
+		conn.Close()
+		log.Printf("onNewConnection ReadHeader err: %+v\n", err)
+		return
+	}
+
+	if !nctst.IsCommand(buf) {
+		conn.Close()
+		log.Println("onNewConnection not command")
+		return
+	}
+
+	command, err := nctst.ReadCommand(buf)
+	if err != nil {
+		log.Printf("onNewConnection ReadCommand err: %+v\n", err)
 		conn.Close()
 		return
 	}
 
-	log.Printf("new connection %s %d %d", conn.RemoteAddr().String(), tunnelID, connID)
+	if command.Type == nctst.Cmd_login {
+		cmd := command.Item.(*nctst.CommandLogin)
 
-	conn.SetDeadline(time.Time{})
+		if cmd.Key != config.Key {
+			conn.Close()
+			log.Println("login error key: " + cmd.Key)
+			return
+		}
 
-	if tunnel_i, ok := tunnels.Load(int(tunnelID)); ok {
-		tunnel := tunnel_i.(*nctst.OuterTunnel)
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan, tunnel.CommandSendChan)
-		tunnel.Add(int(connID), outerconn)
+		clientsLocker.Lock()
+		client, ok := clients[cmd.ClientUUID]
+		if ok {
+			clientsLocker.Unlock()
+			conn.Close()
+			log.Println("login uuid exist: " + cmd.ClientUUID)
+			return
+		}
+
+		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Duplicate)
+		nextClientID++
+		clients[cmd.ClientUUID] = client
+		clientsLocker.Unlock()
+
+		sendLoginReply(conn, client.UUID, client.ID)
+		conn.Close()
+		log.Printf("login success %s %s %d", client.UUID, cmd.UserName, client.ID)
+	} else if command.Type == nctst.Cmd_handshake {
+		cmd := command.Item.(*nctst.CommandHandshake)
+
+		if cmd.Key != config.Key {
+			log.Println("handshake error key: " + cmd.Key)
+			conn.Close()
+			return
+		}
+
+		clientsLocker.Lock()
+		client, ok := clients[cmd.ClientUUID]
+		clientsLocker.Unlock()
+
+		if !ok {
+			conn.Close()
+			log.Printf("handshake not login: %s %d %d %d"+cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
+			return
+		}
+
+		conn.SetDeadline(time.Time{})
+
+		client.AddConn(conn, cmd.TunnelID, cmd.ConnID)
 	} else {
-		tunnel := nctst.NewOuterTunnel(int(tunnelID))
-		if tunnel_i, ok := tunnels.LoadOrStore(int(tunnelID), tunnel); ok {
-			tunnel = tunnel_i.(*nctst.OuterTunnel)
-		} else {
-			tunnel.Run()
-		}
-
-		outerconn := nctst.NewOuterConnection(int(tunnelID), int(connID), conn, k.InputChan, tunnel.OutputChan, tunnel.CommandSendChan)
-		tunnel.Add(int(connID), outerconn)
+		conn.Close()
+		log.Printf("onNewConnection cmd type err: %d\n", command.Type)
 	}
 }
 
-func checkInitCommand(conn *net.TCPConn) (int, int, error) {
-	if t, err := nctst.ReadUInt(conn); err != nil {
-		return 0, 0, fmt.Errorf("checkInitCommand ReadHeader err: %+v", err)
-	} else if !nctst.IsCommand(t) {
-		return 0, 0, fmt.Errorf("checkInitCommand not command: %d", t)
-	}
-
-	command, err := nctst.ReadCommand(conn)
-	if err != nil {
-		return 0, 0, fmt.Errorf("checkInitCommand ReadCommand err: %+v", err)
-	}
-
-	if command.Type != nctst.Cmd_handshake {
-		return 0, 0, fmt.Errorf("checkInitCommand cmd type err: %d", command.Type)
-	}
-
-	cmd := command.Item.(*nctst.CommandHandshake)
-
-	log.Printf("key: %s", cmd.Key)
-	if cmd.Key != config.Key {
-		return 0, 0, errors.New("error key: " + cmd.Key)
-	}
-
-	duplicater.SetNum(cmd.Duplicate)
-
-	return cmd.TunnelID, cmd.ConnID, nil
-}
-
-func smuxLoop() {
-	for {
-		stream, err := smuxServer.AcceptStream()
-		if err != nil {
-			log.Printf("accept stream: %+v\n", err)
-			continue
-		}
-
-		log.Printf("AcceptStream %+v\n", stream.ID())
-		go connectTarget(stream)
-	}
-}
-
-func connectTarget(stream *smux.Stream) {
-	target, err := net.DialTimeout("tcp", config.Target, time.Second*3)
-	if err != nil {
-		log.Printf("connectTarget: %+v\n", err)
-		stream.Close()
-		return
-	}
-
-	target.SetDeadline(time.Time{})
-	stream.SetDeadline(time.Time{})
-
-	log.Printf("transfer %+v\n", stream.ID())
-	go nctst.Transfer(stream, target)
+func sendLoginReply(conn *net.TCPConn, uuid string, id uint) {
+	cmd := &nctst.CommandLoginReply{}
+	cmd.ClientID = id
+	cmd.ClientUUID = uuid
+	nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_loginReply, Item: cmd})
 }

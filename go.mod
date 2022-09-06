@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/haochen233/socks5 v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.14 // indirect
 	github.com/klauspost/reedsolomon v1.10.0 // indirect

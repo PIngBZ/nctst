@@ -3,93 +3,76 @@ package nctst
 import (
 	"log"
 	"math/rand"
+	"net"
 	"sync"
 	"time"
-
-	"sync/atomic"
 )
 
 type OuterTunnel struct {
-	ID int
+	ID       uint
+	ClientID uint
 
 	Ping  int64
 	Speed int
 
-	alive       atomic.Bool
-	connections sync.Map
-	nextPingID  int
+	connections       map[uint]*OuterConnection
+	connectionsLocker sync.Mutex
 
-	OutputChan      chan *BufItem
-	CommandSendChan chan *Command
+	nextPingID uint
 
+	commandSendChan    chan *Command
 	commandReceiveChan chan *Command
+
+	inputChan  chan *BufItem
+	outputChan chan *BufItem
 
 	Die chan struct{}
 
 	dieOnce sync.Once
 }
 
-func NewOuterTunnel(id int) *OuterTunnel {
+func NewOuterTunnel(id uint, clientID uint, inputChan chan *BufItem, outputChan chan *BufItem) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
-	h.OutputChan = make(chan *BufItem, 32)
-	h.CommandSendChan = make(chan *Command, 8)
-	h.commandReceiveChan = make(chan *Command, 8)
-	h.Die = make(chan struct{})
-	h.alive.Store(true)
+	h.ClientID = clientID
 
-	log.Printf("Tunnel created %d", id)
+	h.connections = make(map[uint]*OuterConnection)
+
+	h.commandSendChan = make(chan *Command, 8)
+	h.commandReceiveChan = make(chan *Command, 8)
+	h.inputChan = inputChan
+	h.outputChan = outputChan
+
+	h.Die = make(chan struct{})
+
+	go h.daemon()
+	h.startPing()
+
+	AttachCommandObserver(h.commandReceiveChan)
+
+	log.Printf("new tunnel %d %d\n", clientID, id)
 	return h
 }
 
-func (h *OuterTunnel) Run() {
-	AttachCommandObserver(h.commandReceiveChan)
-	go h.daemon()
-	h.startPing()
-}
-
-func (h *OuterTunnel) Close() {
-	var once bool
-	h.dieOnce.Do(func() {
-		close(h.Die)
-		once = true
-	})
-
-	if !once {
-		return
-	}
-
-	RemoveCommandObserver(h.commandReceiveChan)
-
-	h.connections.Range(func(key, value any) bool {
-		value.(*OuterConnection).Close()
-		return true
-	})
-}
-
-func (h *OuterTunnel) IsAlive() bool {
-	return h.alive.Load()
-}
-
-func (h *OuterTunnel) Add(id int, outerConn *OuterConnection) {
+func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (dieSignal chan struct{}) {
 	h.Remove(id)
-	h.connections.Store(id, outerConn)
+
+	h.connectionsLocker.Lock()
+	defer h.connectionsLocker.Unlock()
+
+	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.inputChan, h.outputChan, h.commandSendChan)
+	h.connections[id] = outer
+
+	return outer.Die
 }
 
-func (h *OuterTunnel) Remove(id int) {
-	if conn, ok := h.connections.LoadAndDelete(id); ok {
-		conn.(*OuterConnection).Close()
-	}
-}
+func (h *OuterTunnel) Remove(id uint) {
+	h.connectionsLocker.Lock()
+	defer h.connectionsLocker.Unlock()
 
-func (h *OuterTunnel) TrySend(buf *BufItem) bool {
-	select {
-	case h.OutputChan <- buf:
-		h.alive.Store(true)
-		return true
-	case <-time.After(time.Millisecond * 20):
-		h.alive.Store(false)
-		return false
+	if outer, ok := h.connections[id]; ok {
+		delete(h.connections, id)
+		outer.Close()
 	}
 }
 
@@ -110,25 +93,24 @@ func (h *OuterTunnel) daemon() {
 func (h *OuterTunnel) startPing() {
 	cmd := &CommandPing{}
 	cmd.Step = 1
+	cmd.ClientID = h.ClientID
 	cmd.TunnelID = h.ID
 	cmd.ID = h.nextPingID
 	h.nextPingID++
 	cmd.SendTime = time.Now().UnixNano() / 1e6
 
-	log.Printf("Ping: %d %d", cmd.TunnelID, cmd.ID)
+	log.Printf("Ping: %d %d %d\n", cmd.ClientID, cmd.TunnelID, cmd.ID)
 	h.sendCommand(&Command{Type: Cmd_ping, Item: cmd})
 }
 
 func (h *OuterTunnel) sendCommand(command *Command) {
 	select {
-	case h.CommandSendChan <- command:
+	case h.commandSendChan <- command:
 	default:
 	}
 }
 
 func (h *OuterTunnel) onReceiveCommand(command *Command) {
-	h.alive.Store(true)
-
 	switch command.Type {
 	case Cmd_ping:
 		h.onReceivePing(command.Item.(*CommandPing))
@@ -142,6 +124,6 @@ func (h *OuterTunnel) onReceivePing(ping *CommandPing) {
 		h.sendCommand(&Command{Type: Cmd_ping, Item: ping})
 	case 2:
 		h.Ping = (int64(Min(int(h.Ping), 5000)) + time.Now().UnixNano()/1e6 - ping.SendTime) / 2
-		log.Printf("updatePing: tunnel%d %d %d", ping.TunnelID, ping.ID, h.Ping)
+		log.Printf("updatePing: %d %d %d %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
 	}
 }

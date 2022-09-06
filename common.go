@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	DataBufPool = NewPool(KCP_DATA_BUF_SIZE)
+	DataBufPool = NewPool(DATA_BUF_SIZE)
 )
 
 func CheckError(err error) {
@@ -38,9 +39,9 @@ func OpenLog() {
 func SmuxConfig() *smux.Config {
 	smuxConfig := smux.DefaultConfig()
 	smuxConfig.Version = 1
-	smuxConfig.MaxFrameSize = 512
-	smuxConfig.MaxReceiveBuffer = 1024 * 1024 * 8
-	smuxConfig.KeepAliveInterval = time.Second * 30
+	smuxConfig.MaxFrameSize = 256
+	smuxConfig.MaxReceiveBuffer = 1024 * 1024
+	smuxConfig.KeepAliveInterval = time.Second * 10
 	smuxConfig.KeepAliveTimeout = time.Hour * 24 * 30
 
 	err := smux.VerifyConfig(smuxConfig)
@@ -49,7 +50,7 @@ func SmuxConfig() *smux.Config {
 	return smuxConfig
 }
 
-var _copy_buf_pool = NewPool(1024 * 128)
+var _copy_buf_pool = NewPool(1024 * 4)
 
 func Transfer(p1, p2 io.ReadWriteCloser) {
 	streamCopy := func(to, from io.ReadWriteCloser) {
@@ -78,6 +79,10 @@ func Max(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func ToUint(data []byte) uint32 {
+	return binary.BigEndian.Uint32(data)
 }
 
 func WriteData(data []byte, dst io.Writer, written int) (int, error) {
@@ -151,4 +156,22 @@ func ReadLString(reader io.Reader) (string, error) {
 		return "", err
 	}
 	return string(buf), nil
+}
+
+func ReadLBuf(reader io.Reader) (*BufItem, error) {
+	l, err := ReadUInt(reader)
+	if err != nil {
+		return nil, err
+	}
+
+	if l == 0 || l > MAX_TCP_DATA_INTERNET_LEN {
+		return nil, fmt.Errorf("receiveLoop read len error")
+	}
+
+	buf := DataBufPool.Get()
+	if _, err = buf.ReadNFromReader(reader, int(l)); err != nil {
+		buf.Release()
+		return nil, err
+	}
+	return buf, nil
 }

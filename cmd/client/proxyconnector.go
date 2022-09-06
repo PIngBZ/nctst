@@ -10,17 +10,18 @@ import (
 )
 
 type ProxyConnector struct {
-	ID      int
-	ProxyID int
+	ID      uint
+	ProxyID uint
 	Address string
 
 	tunnel      *nctst.OuterTunnel
 	receiveChan chan *nctst.BufItem
 
-	outer *nctst.OuterConnection
+	outer          *nctst.OuterConnection
+	outerDieSignal chan struct{}
 }
 
-func NewProxyConnector(id int, proxyID int, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
+func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
 	h := &ProxyConnector{}
 	h.ID = id
 	h.ProxyID = proxyID
@@ -31,12 +32,13 @@ func NewProxyConnector(id int, proxyID int, addr string, tunnel *nctst.OuterTunn
 
 	go h.daemon()
 
-	log.Printf("ProxyConnector created %d %d", proxyID, id)
+	log.Printf("new proxy connector %d %d\n", proxyID, id)
 	return h
 }
 
 func (h *ProxyConnector) connect() {
-	log.Printf("ProxyConnector connecting %d %d", h.ProxyID, h.ID)
+	log.Printf("ProxyConnector connecting %d %d\n", h.ProxyID, h.ID)
+
 	client := socks5.Client{
 		ProxyAddr: h.Address,
 		Auth: map[socks5.METHOD]socks5.Authenticator{
@@ -52,23 +54,26 @@ func (h *ProxyConnector) connect() {
 			continue
 		}
 		if err = h.sendHandshake(conn); err != nil {
+			conn.Close()
+			log.Printf("sendHandshake error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
 		break
 	}
 
-	log.Printf("ProxyConnector connect success %d %d", h.ProxyID, h.ID)
 	conn.SetDeadline(time.Time{})
-	h.outer = nctst.NewOuterConnection(h.tunnel.ID, h.ID, conn, h.receiveChan, h.tunnel.OutputChan, h.tunnel.CommandSendChan)
-	h.tunnel.Add(h.ID, h.outer)
+	h.outerDieSignal = h.tunnel.AddConn(conn, h.ID)
+
+	log.Printf("ProxyConnector connect success %d %d\n", h.ProxyID, h.ID)
 }
 
 func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	cmd := &nctst.CommandHandshake{}
+	cmd.ClientUUID = UUID
+	cmd.ClientID = ClientID
 	cmd.TunnelID = h.tunnel.ID
 	cmd.ConnID = h.ID
-	cmd.Duplicate = config.Duplicate
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }
@@ -78,7 +83,7 @@ func (h *ProxyConnector) daemon() {
 
 	for {
 		select {
-		case <-h.outer.Die:
+		case <-h.outerDieSignal:
 			h.tunnel.Remove(h.outer.ID)
 			h.reconnect()
 		}
@@ -86,7 +91,7 @@ func (h *ProxyConnector) daemon() {
 }
 
 func (h *ProxyConnector) reconnect() {
-	log.Printf("ProxyConnector waiting 5s to reconnect %d %d", h.ProxyID, h.ID)
+	log.Printf("ProxyConnector waiting 5s to reconnect %d %d\n", h.ProxyID, h.ID)
 	select {
 	case <-time.After(time.Second * 5):
 		h.connect()

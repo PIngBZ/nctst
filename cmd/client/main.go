@@ -5,19 +5,22 @@ import (
 	"flag"
 	"log"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
 
 var (
+	UUID     = uuid.NewString()
+	ClientID uint
+
 	configFile string
 	config     *Config
-	k          = nctst.NewKcp(10001)
+
+	kcp        *nctst.Kcp
 	duplicater *nctst.Duplicater
-	tunnels    = &sync.Map{}
 )
 
 func init() {
@@ -33,6 +36,8 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
+
+	go nctst.CommandDaemon()
 }
 
 func main() {
@@ -42,15 +47,17 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	nctst.CheckError(err)
 
-	smuxClient, err := smux.Client(nctst.NewCompStream(k), nctst.SmuxConfig())
+	if !Login() {
+		return
+	}
+
+	kcp = nctst.NewKcp(ClientID)
+	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan)
+
+	smuxClient, err := smux.Client(nctst.NewCompStream(kcp), nctst.SmuxConfig())
 	nctst.CheckError(err)
 
 	startUpstreamProxies()
-
-	duplicater = nctst.NewDuplicater(config.Duplicate, k.OutputChan, tunnels)
-	duplicater.SetNum(config.Duplicate)
-
-	go nctst.CommandDaemon()
 
 	for {
 		conn, err := listener.AcceptTCP()
@@ -79,10 +86,8 @@ func main() {
 func startUpstreamProxies() {
 	proxies = make([]*Proxy, len(config.Proxies))
 
-	for i, server := range config.Proxies {
-		tunnel := nctst.NewOuterTunnel(i)
-		tunnels.Store(i, tunnel)
-		tunnel.Run()
-		proxies[i] = NewProxy(i, server, k.InputChan, tunnel)
+	for i, serverIP := range config.Proxies {
+		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, duplicater.Output, kcp.InputChan)
+		proxies[i] = NewProxy(uint(i), serverIP, kcp.InputChan, tunnel)
 	}
 }

@@ -7,8 +7,9 @@ import (
 )
 
 type OuterConnection struct {
-	TunnelID int
-	ID       int
+	ID       uint
+	ClientID uint
+	TunnelID uint
 	Addr     string
 	Die      chan struct{}
 
@@ -20,10 +21,12 @@ type OuterConnection struct {
 	dieOnce sync.Once
 }
 
-func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
+func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn *net.TCPConn, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
 	h := &OuterConnection{}
-	h.TunnelID = tunnelID
 	h.ID = id
+	h.ClientID = clientID
+	h.TunnelID = tunnelID
+
 	h.Addr = conn.RemoteAddr().String()
 
 	h.conn = conn
@@ -32,12 +35,12 @@ func NewOuterConnection(tunnelID int, id int, conn *net.TCPConn, receiveChan cha
 	h.commandChan = commandChan
 
 	h.Die = make(chan struct{})
-
 	once := &sync.Once{}
+
 	go h.receiveLoop(conn, once)
 	go h.sendLoop(conn, once)
 
-	log.Printf("OuterConnection created %d %d", tunnelID, id)
+	log.Printf("new connection %d %d %d\n", clientID, tunnelID, id)
 	return h
 }
 
@@ -53,10 +56,10 @@ func (h *OuterConnection) Close() {
 	}
 
 	if h.conn != nil {
-		log.Printf("OuterConnection.Close %s\n", h.conn.RemoteAddr().String())
+		log.Printf("OuterConnection.Close %s %d %d %d\n", h.conn.RemoteAddr().String(), h.ClientID, h.TunnelID, h.ID)
 		h.conn.Close()
 	} else {
-		log.Println("OuterConnection.Close nil")
+		log.Printf("OuterConnection.Close nil, %d %d %d\n", h.ClientID, h.TunnelID, h.ID)
 	}
 }
 
@@ -64,43 +67,12 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 	defer once.Do(h.Close)
 
 	for {
-		l, err := ReadUInt(h.conn)
+		buf, err := ReadLBuf(conn)
 		if err != nil {
-			log.Printf("%s %+v\n", h.Addr, err)
-			return
+			log.Printf("receiveLoop ReadLenBuf error %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
 		}
 
-		if l == 0 {
-			log.Printf("receiveLoop read len 0, %s", h.Addr)
-			return
-		}
-
-		if l > KCP_DATA_BUF_SIZE+1 {
-			log.Printf("%s error len %d\n", h.Addr, l)
-			return
-		}
-
-		isCommand := IsCommand(l)
-		if isCommand {
-			l, err = ReadUInt(h.conn)
-			if err != nil {
-				log.Printf("%s %+v\n", h.Addr, err)
-				return
-			}
-			if l > 1024 {
-				log.Printf("%s error command len %d\n", h.Addr, l)
-				return
-			}
-		}
-
-		buf := DataBufPool.Get()
-		if _, err = buf.ReadNFromReader(conn, int(l)); err != nil {
-			buf.Release()
-			log.Printf("%s %+v\n", h.Addr, err)
-			return
-		}
-
-		if isCommand {
+		if IsCommand(buf) {
 			select {
 			case CommandReceiveChan <- buf:
 			case <-h.Die:
@@ -130,18 +102,18 @@ func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
 		case buf := <-h.sendChan:
 			if err := WriteUInt(conn, uint32(buf.Size())); err != nil {
 				buf.Release()
-				log.Printf("WriteUInt error: %s %+v\n", h.Addr, err)
+				log.Printf("sendLoop WriteUInt error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
 				return
 			}
 			_, err := conn.Write(buf.Data())
 			buf.Release()
 			if err != nil {
-				log.Printf("WriteUInt error: %s %+v\n", h.Addr, err)
+				log.Printf("sendLoop WriteUInt error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
 				return
 			}
 		case command := <-h.commandChan:
 			if err := SendCommand(conn, command); err != nil {
-				log.Printf("SendCommand error: %s %+v\n", h.Addr, err)
+				log.Printf("sendLoop SendCommand error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
 				return
 			}
 		}
