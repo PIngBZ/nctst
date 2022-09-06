@@ -101,6 +101,7 @@ func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
 		case <-h.Die:
 			return
 		case buf := <-h.sendChan:
+			log.Printf("send %d\n", buf.Size())
 			if err := WriteUInt(conn, uint32(buf.Size())); err != nil {
 				buf.Release()
 				log.Printf("sendLoop WriteUInt error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)

@@ -47,9 +47,7 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	nctst.CheckError(err)
 
-	if !Login() {
-		return
-	}
+	WaittingLogin()
 
 	kcp = nctst.NewKcp(ClientID)
 	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan)
@@ -87,7 +85,7 @@ func startUpstreamProxies() {
 	proxies = make([]*Proxy, len(config.Proxies))
 
 	for i, serverIP := range config.Proxies {
-		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, duplicater.Output, kcp.InputChan)
-		proxies[i] = NewProxy(uint(i), serverIP, kcp.InputChan, tunnel)
+		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
+		proxies[i] = NewProxy(uint(i), serverIP, tunnel)
 	}
 }

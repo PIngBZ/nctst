@@ -104,7 +104,7 @@ func onNewConnection(conn *net.TCPConn) {
 
 		sendLoginReply(conn, client.UUID, client.ID)
 		conn.Close()
-		log.Printf("login success %s %s %d", client.UUID, cmd.UserName, client.ID)
+		log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
 	} else if command.Type == nctst.Cmd_handshake {
 		cmd := command.Item.(*nctst.CommandHandshake)
 
@@ -120,7 +120,7 @@ func onNewConnection(conn *net.TCPConn) {
 
 		if !ok {
 			conn.Close()
-			log.Printf("handshake not login: %s %d %d %d"+cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
+			log.Printf("handshake not login: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
 			return
 		}
 

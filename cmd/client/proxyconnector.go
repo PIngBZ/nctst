@@ -14,21 +14,18 @@ type ProxyConnector struct {
 	ProxyID uint
 	Address string
 
-	tunnel      *nctst.OuterTunnel
-	receiveChan chan *nctst.BufItem
+	tunnel *nctst.OuterTunnel
 
-	outer          *nctst.OuterConnection
 	outerDieSignal chan struct{}
 }
 
-func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTunnel, receiveChan chan *nctst.BufItem) *ProxyConnector {
+func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTunnel) *ProxyConnector {
 	h := &ProxyConnector{}
 	h.ID = id
 	h.ProxyID = proxyID
 	h.Address = addr
 
 	h.tunnel = tunnel
-	h.receiveChan = receiveChan
 
 	go h.daemon()
 
@@ -84,7 +81,7 @@ func (h *ProxyConnector) daemon() {
 	for {
 		select {
 		case <-h.outerDieSignal:
-			h.tunnel.Remove(h.outer.ID)
+			h.tunnel.Remove(h.ID)
 			h.reconnect()
 		}
 	}

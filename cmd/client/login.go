@@ -4,22 +4,26 @@ import (
 	"errors"
 	"log"
 	"net"
+	"time"
 
 	"github.com/PIngBZ/nctst"
 	"github.com/haochen233/socks5"
 )
 
-func Login() bool {
+func WaittingLogin() {
 	log.Println("login ...")
-	for _, serverIP := range config.Proxies {
-		if err := tryLogin(serverIP); err != nil {
-			log.Printf("try login failed %+v\n", err)
-		} else {
-			log.Printf("login success %d\n", ClientID)
-			return true
+	for {
+		for _, serverIP := range config.Proxies {
+			if err := tryLogin(serverIP); err != nil {
+				log.Printf("try login failed %+v\n", err)
+			} else {
+				log.Printf("login success %d\n", ClientID)
+				return
+			}
 		}
+		log.Println("wait 5s to retry ...")
+		time.Sleep(time.Second * 5)
 	}
-	return false
 }
 
 func tryLogin(addr string) error {

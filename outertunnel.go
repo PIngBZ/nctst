@@ -23,15 +23,16 @@ type OuterTunnel struct {
 	commandSendChan    chan *Command
 	commandReceiveChan chan *Command
 
-	inputChan  chan *BufItem
-	outputChan chan *BufItem
+	receiveChan chan *BufItem
+	sendChan    chan *BufItem
+	outputChan  chan *BufItem
 
 	Die chan struct{}
 
 	dieOnce sync.Once
 }
 
-func NewOuterTunnel(id uint, clientID uint, inputChan chan *BufItem, outputChan chan *BufItem) *OuterTunnel {
+func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan chan *BufItem) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
 	h.ClientID = clientID
@@ -40,11 +41,13 @@ func NewOuterTunnel(id uint, clientID uint, inputChan chan *BufItem, outputChan 
 
 	h.commandSendChan = make(chan *Command, 8)
 	h.commandReceiveChan = make(chan *Command, 8)
-	h.inputChan = inputChan
-	h.outputChan = outputChan
+	h.receiveChan = receiveChan
+	h.sendChan = sendChan
+	h.outputChan = make(chan *BufItem)
 
 	h.Die = make(chan struct{})
 
+	go h.transferLoop()
 	go h.daemon()
 	h.startPing()
 
@@ -60,7 +63,7 @@ func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (dieSignal chan struct
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
 
-	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.inputChan, h.outputChan, h.commandSendChan)
+	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.receiveChan, h.outputChan, h.commandSendChan)
 	h.connections[id] = outer
 
 	return outer.Die
@@ -73,6 +76,12 @@ func (h *OuterTunnel) Remove(id uint) {
 	if outer, ok := h.connections[id]; ok {
 		delete(h.connections, id)
 		outer.Close()
+	}
+}
+
+func (h *OuterTunnel) transferLoop() {
+	for buf := range h.sendChan {
+		h.outputChan <- buf
 	}
 }
 

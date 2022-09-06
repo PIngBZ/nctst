@@ -39,7 +39,7 @@ func OpenLog() {
 func SmuxConfig() *smux.Config {
 	smuxConfig := smux.DefaultConfig()
 	smuxConfig.Version = 1
-	smuxConfig.MaxFrameSize = 256
+	smuxConfig.MaxFrameSize = 1024 * 4
 	smuxConfig.MaxReceiveBuffer = 1024 * 1024
 	smuxConfig.KeepAliveInterval = time.Second * 10
 	smuxConfig.KeepAliveTimeout = time.Hour * 24 * 30
@@ -50,7 +50,7 @@ func SmuxConfig() *smux.Config {
 	return smuxConfig
 }
 
-var _copy_buf_pool = NewPool(1024 * 4)
+var _copy_buf_pool = NewPool(1024 * 32)
 
 func Transfer(p1, p2 io.ReadWriteCloser) {
 	streamCopy := func(to, from io.ReadWriteCloser) {
