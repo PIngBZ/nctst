@@ -57,6 +57,7 @@ func sendLogin(conn *net.TCPConn) error {
 	cmd := &nctst.CommandLogin{}
 	cmd.ClientUUID = UUID
 	cmd.Duplicate = config.Duplicate
+	cmd.Compress = false
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }

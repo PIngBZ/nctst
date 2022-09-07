@@ -20,6 +20,8 @@ var (
 	config     *Config
 
 	kcp        *nctst.Kcp
+	proxies    = []*Proxy{}
+	tunnels    = make([]*nctst.OuterTunnel, 0)
 	duplicater *nctst.Duplicater
 )
 
@@ -50,9 +52,14 @@ func main() {
 	WaittingLogin()
 
 	kcp = nctst.NewKcp(ClientID)
-	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan)
+	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 0, tunnels })
 
-	smuxClient, err := smux.Client(nctst.NewCompStream(kcp), nctst.SmuxConfig())
+	var smuxClient *smux.Session
+	if config.Compress {
+		smuxClient, err = smux.Client(nctst.NewCompStream(kcp), nctst.SmuxConfig())
+	} else {
+		smuxClient, err = smux.Client(kcp, nctst.SmuxConfig())
+	}
 	nctst.CheckError(err)
 
 	startUpstreamProxies()
@@ -87,5 +94,6 @@ func startUpstreamProxies() {
 	for i, serverIP := range config.Proxies {
 		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
 		proxies[i] = NewProxy(uint(i), serverIP, tunnel)
+		tunnels = append(tunnels, tunnel)
 	}
 }

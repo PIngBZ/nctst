@@ -6,10 +6,6 @@ import (
 	"github.com/PIngBZ/nctst"
 )
 
-var (
-	proxies = []*Proxy{}
-)
-
 type Proxy struct {
 	ID   uint
 	Addr string

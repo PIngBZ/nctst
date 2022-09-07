@@ -26,6 +26,7 @@ const (
 	Cmd_login
 	Cmd_loginReply
 	Cmd_handshake
+	Cmd_handshakeReply
 	Cmd_ping
 
 	Cmd_max
@@ -142,6 +143,8 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 		obj = &CommandLoginReply{}
 	case Cmd_handshake:
 		obj = &CommandHandshake{}
+	case Cmd_handshakeReply:
+		obj = &CommandHandshakeReply{}
 	case Cmd_ping:
 		obj = &CommandPing{}
 	default:
@@ -164,6 +167,7 @@ type CommandLogin struct {
 	UserName   string
 	PassWord   string
 	Duplicate  int
+	Compress   bool
 	Key        string
 }
 
@@ -178,6 +182,18 @@ type CommandHandshake struct {
 	TunnelID   uint
 	ConnID     uint
 	Key        string
+}
+
+type HandshakeReply_Code uint32
+
+const (
+	HandshakeReply_success HandshakeReply_Code = iota
+	HandshakeReply_needlogin
+)
+
+type CommandHandshakeReply struct {
+	ClientUUID string
+	Code       HandshakeReply_Code
 }
 
 type CommandPing struct {

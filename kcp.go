@@ -39,9 +39,9 @@ func NewKcp(connID uint) *Kcp {
 
 	h.session.SetStreamMode(true)
 	h.session.SetWriteDelay(false)
-	h.session.SetNoDelay(1, 10, 10, 1)
+	h.session.SetNoDelay(1, 10, 6, 1)
 	h.session.SetWindowSize(64, 64)
-	h.session.SetMtu(1024 * 32)
+	h.session.SetMtu(1024 * 8)
 	h.session.SetACKNoDelay(true)
 
 	h.InputChan = make(chan *BufItem, KCP_UDP_RECEIVE_BUF_NUM)

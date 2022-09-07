@@ -97,7 +97,7 @@ func onNewConnection(conn *net.TCPConn) {
 			return
 		}
 
-		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Duplicate)
+		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate)
 		nextClientID++
 		clients[cmd.ClientUUID] = client
 		clientsLocker.Unlock()
@@ -119,10 +119,13 @@ func onNewConnection(conn *net.TCPConn) {
 		clientsLocker.Unlock()
 
 		if !ok {
+			sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_needlogin)
 			conn.Close()
 			log.Printf("handshake not login: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
 			return
 		}
+
+		sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_success)
 
 		conn.SetDeadline(time.Time{})
 
@@ -138,4 +141,11 @@ func sendLoginReply(conn *net.TCPConn, uuid string, id uint) {
 	cmd.ClientID = id
 	cmd.ClientUUID = uuid
 	nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_loginReply, Item: cmd})
+}
+
+func sendHandshakeReply(conn *net.TCPConn, uuid string, code nctst.HandshakeReply_Code) {
+	cmd := &nctst.CommandHandshakeReply{}
+	cmd.ClientUUID = uuid
+	cmd.Code = code
+	nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshakeReply, Item: cmd})
 }

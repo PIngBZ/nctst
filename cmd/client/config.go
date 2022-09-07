@@ -11,6 +11,7 @@ type Config struct {
 	ServerPort   string   `json:"serverPort"`
 	Proxies      []string `json:"proxies"`
 	Connperproxy int      `json:"connperproxy"`
+	Compress     bool     `json:"compress"`
 	Key          string   `json:"key"`
 	Duplicate    int      `json:"duplicate"`
 }

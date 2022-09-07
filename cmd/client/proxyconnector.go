@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net"
 	"time"
@@ -46,13 +47,22 @@ func (h *ProxyConnector) connect() {
 	for {
 		var err error
 		conn, err = client.Connect(socks5.Version5, config.ServerIP+":"+config.ServerPort)
+
 		if err != nil {
 			time.Sleep(time.Second * 5)
 			continue
 		}
+
 		if err = h.sendHandshake(conn); err != nil {
 			conn.Close()
 			log.Printf("sendHandshake error %+v\n", err)
+			time.Sleep(time.Second * 5)
+			continue
+		}
+
+		if err = h.receiveHandshakeReply(conn); err != nil {
+			conn.Close()
+			log.Printf("receiveHandshakeReply error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
@@ -73,6 +83,30 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	cmd.ConnID = h.ID
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
+}
+
+func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
+	buf, err := nctst.ReadLBuf(conn)
+	if err != nil {
+		return err
+	}
+
+	if nctst.GetCommandType(buf) != nctst.Cmd_handshakeReply {
+		return errors.New("receiveHandshakeReply type error")
+	}
+
+	command, err := nctst.ReadCommand(buf)
+	if err != nil {
+		return err
+	}
+	cmd := command.Item.(*nctst.CommandHandshakeReply)
+
+	if cmd.Code == nctst.HandshakeReply_needlogin {
+		// TODO relogin
+		return errors.New("need login")
+	}
+
+	return nil
 }
 
 func (h *ProxyConnector) daemon() {

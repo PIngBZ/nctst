@@ -27,6 +27,8 @@ type OuterTunnel struct {
 	sendChan    chan *BufItem
 	outputChan  chan *BufItem
 
+	DirectChan chan *BufItem
+
 	Die chan struct{}
 
 	dieOnce sync.Once
@@ -44,6 +46,7 @@ func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan 
 	h.receiveChan = receiveChan
 	h.sendChan = sendChan
 	h.outputChan = make(chan *BufItem)
+	h.DirectChan = make(chan *BufItem)
 
 	h.Die = make(chan struct{})
 
@@ -80,8 +83,18 @@ func (h *OuterTunnel) Remove(id uint) {
 }
 
 func (h *OuterTunnel) transferLoop() {
-	for buf := range h.sendChan {
-		h.outputChan <- buf
+	for {
+		select {
+		case buf := <-h.DirectChan:
+			h.outputChan <- buf
+		default:
+			select {
+			case buf := <-h.DirectChan:
+				h.outputChan <- buf
+			case buf := <-h.sendChan:
+				h.outputChan <- buf
+			}
+		}
 	}
 }
 
@@ -92,7 +105,7 @@ func (h *OuterTunnel) daemon() {
 		case <-h.Die:
 			return
 		case <-ticker.C:
-			h.startPing()
+			//h.startPing()
 		case command := <-h.commandReceiveChan:
 			h.onReceiveCommand(command)
 		}
@@ -127,12 +140,16 @@ func (h *OuterTunnel) onReceiveCommand(command *Command) {
 }
 
 func (h *OuterTunnel) onReceivePing(ping *CommandPing) {
+	if ping.ClientID != h.ClientID || ping.TunnelID != h.ID {
+		return
+	}
+
 	switch ping.Step {
 	case 1:
 		ping.Step = 2
 		h.sendCommand(&Command{Type: Cmd_ping, Item: ping})
 	case 2:
 		h.Ping = (int64(Min(int(h.Ping), 5000)) + time.Now().UnixNano()/1e6 - ping.SendTime) / 2
-		log.Printf("updatePing: %d %d %d %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
+		log.Printf("updatePing: client %d tunnel %d id %d ping %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
 	}
 }
