@@ -1,9 +1,0 @@
-{
-    "listen": ":6101",
-    "serverIP": "127.0.0.1",
-    "serverPort": "8000",
-    "proxies": ["127.0.0.1:7890"],
-    "connperproxy": 5,
-    "key": "123",
-    "duplicate": 2
-}
