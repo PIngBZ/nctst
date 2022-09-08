@@ -11,6 +11,9 @@ type Duplicater struct {
 	tunnelsListCallback func(uint32) (uint32, []*OuterTunnel)
 	input               chan *BufItem
 	num                 int32
+
+	tunnelsListVer uint32
+	tunnels        []*OuterTunnel
 }
 
 func NewDuplicater(num int, input chan *BufItem, tunnelsListCallback func(uint32) (uint32, []*OuterTunnel)) *Duplicater {
@@ -37,34 +40,48 @@ func (h *Duplicater) GetNum() int {
 }
 
 func (h *Duplicater) daemon() {
-	var tunnelsListVer uint32
-	var tunnels []*OuterTunnel
 
 	for item := range h.input {
 		if item.Size() < 128 {
-			sent := false
-			cp := item.Copy()
-			v, t := h.tunnelsListCallback(tunnelsListVer)
-			if t != nil {
-				tunnels = t
+			prepare := item
+			item = nil
+		outer:
+			for prepare.Size() < 1024 {
+				select {
+				case next := <-h.input:
+					if next.Size() < 128 {
+						prepare.Append(next)
+						next.Release()
+					} else {
+						item = next
+						break outer
+					}
+				default:
+					break outer
+				}
 			}
-			tunnelsListVer = v
-			for _, tunnel := range tunnels {
+
+			h.updateTunnelsList()
+			sent := false
+			cp := prepare.Copy()
+			for _, tunnel := range h.tunnels {
 				select {
 				case tunnel.DirectChan <- cp:
-					cp = item.Copy()
+					cp = prepare.Copy()
 					sent = true
 				default:
 				}
 			}
 			cp.Release()
 			if !sent {
-				h.Output <- item
+				h.Output <- prepare
 			} else {
-				item.Release()
+				prepare.Release()
 			}
-		} else {
-			if item.Size() < 256 {
+		}
+
+		if item != nil {
+			if item.Size() < 1024 {
 				num := int(atomic.LoadInt32(&h.num))
 				for i := 1; i < num; i++ {
 					h.Output <- item.Copy()
@@ -73,4 +90,12 @@ func (h *Duplicater) daemon() {
 			h.Output <- item
 		}
 	}
+}
+
+func (h *Duplicater) updateTunnelsList() {
+	v, t := h.tunnelsListCallback(h.tunnelsListVer)
+	if t != nil {
+		h.tunnels = t
+	}
+	h.tunnelsListVer = v
 }

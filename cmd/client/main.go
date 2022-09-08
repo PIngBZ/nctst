@@ -52,7 +52,7 @@ func main() {
 	WaittingLogin()
 
 	kcp = nctst.NewKcp(ClientID)
-	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 0, tunnels })
+	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 100, tunnels })
 
 	var smuxClient *smux.Session
 	if config.Compress {

@@ -68,11 +68,13 @@ func onNewConnection(conn *net.TCPConn) {
 
 	if !nctst.IsCommand(buf) {
 		conn.Close()
+		buf.Release()
 		log.Println("onNewConnection not command")
 		return
 	}
 
 	command, err := nctst.ReadCommand(buf)
+	buf.Release()
 	if err != nil {
 		log.Printf("onNewConnection ReadCommand err: %+v\n", err)
 		conn.Close()

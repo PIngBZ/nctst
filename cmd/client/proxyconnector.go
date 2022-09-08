@@ -10,6 +10,10 @@ import (
 	"github.com/haochen233/socks5"
 )
 
+var (
+	ErrorNeedLogin = errors.New("Error Need Login")
+)
+
 type ProxyConnector struct {
 	ID      uint
 	ProxyID uint
@@ -34,11 +38,12 @@ func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTu
 	return h
 }
 
-func (h *ProxyConnector) connect() {
+func (h *ProxyConnector) connect() bool {
 	log.Printf("ProxyConnector connecting %d %d\n", h.ProxyID, h.ID)
 
 	client := socks5.Client{
 		ProxyAddr: h.Address,
+		Timeout:   time.Second * 5,
 		Auth: map[socks5.METHOD]socks5.Authenticator{
 			socks5.NO_AUTHENTICATION_REQUIRED: &socks5.NoAuth{},
 		},
@@ -53,6 +58,8 @@ func (h *ProxyConnector) connect() {
 			continue
 		}
 
+		conn.SetDeadline(time.Now().Add(time.Second * 5))
+
 		if err = h.sendHandshake(conn); err != nil {
 			conn.Close()
 			log.Printf("sendHandshake error %+v\n", err)
@@ -60,9 +67,13 @@ func (h *ProxyConnector) connect() {
 			continue
 		}
 
-		if err = h.receiveHandshakeReply(conn); err != nil {
+		if err = h.receiveHandshakeReply(conn); err == ErrorNeedLogin {
 			conn.Close()
-			log.Printf("receiveHandshakeReply error %+v\n", err)
+			log.Printf("receiveHandshakeReply Error need login, exit\n")
+			return false
+		} else if err != nil {
+			conn.Close()
+			log.Printf("sendHandshake error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
@@ -73,6 +84,7 @@ func (h *ProxyConnector) connect() {
 	h.outerDieSignal = h.tunnel.AddConn(conn, h.ID)
 
 	log.Printf("ProxyConnector connect success %d %d\n", h.ProxyID, h.ID)
+	return true
 }
 
 func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
@@ -92,18 +104,20 @@ func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
 	}
 
 	if nctst.GetCommandType(buf) != nctst.Cmd_handshakeReply {
+		buf.Release()
 		return errors.New("receiveHandshakeReply type error")
 	}
 
 	command, err := nctst.ReadCommand(buf)
+	buf.Release()
+
 	if err != nil {
 		return err
 	}
 	cmd := command.Item.(*nctst.CommandHandshakeReply)
 
 	if cmd.Code == nctst.HandshakeReply_needlogin {
-		// TODO relogin
-		return errors.New("need login")
+		return ErrorNeedLogin
 	}
 
 	return nil
@@ -111,20 +125,21 @@ func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
 
 func (h *ProxyConnector) daemon() {
 	h.connect()
-
 	for {
 		select {
 		case <-h.outerDieSignal:
 			h.tunnel.Remove(h.ID)
-			h.reconnect()
+			if !h.reconnect() {
+				return
+			}
 		}
 	}
 }
 
-func (h *ProxyConnector) reconnect() {
+func (h *ProxyConnector) reconnect() bool {
 	log.Printf("ProxyConnector waiting 5s to reconnect %d %d\n", h.ProxyID, h.ID)
 	select {
 	case <-time.After(time.Second * 5):
-		h.connect()
+		return h.connect()
 	}
 }

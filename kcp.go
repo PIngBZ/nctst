@@ -12,6 +12,8 @@ import (
 )
 
 type Kcp struct {
+	ID uint
+
 	session  *kcpgo.UDPSession
 	fakeAddr *net.UDPAddr
 
@@ -34,6 +36,7 @@ func NewKcp(connID uint) *Kcp {
 
 	h := &Kcp{}
 
+	h.ID = connID
 	h.fakeAddr, _ = net.ResolveUDPAddr("udp", "127.0.0.1:1234")
 	h.session, _ = kcpgo.NewConn3(uint32(connID), h.fakeAddr, nil, 0, 0, h)
 
@@ -66,11 +69,11 @@ func (h *Kcp) Close() error {
 	close(h.die)
 
 	go func() {
-		time.Sleep(time.Second * 5)
+		time.Sleep(time.Second * 60)
 		h.session.Close()
 	}()
 
-	log.Println("Kcp closed")
+	log.Printf("Kcp %d closed", h.ID)
 	return nil
 }
 

@@ -85,6 +85,10 @@ func (h *BufItem) ReadNFromReader(src io.Reader, n int) (int, error) {
 	return n, err
 }
 
+func (h *BufItem) Append(data *BufItem) {
+	h.AppendData(data.Data())
+}
+
 func (h *BufItem) AppendData(data []byte) *BufItem {
 	if len(data) > h.FreeSpace() {
 		log.Println("BufItem AppendData no enough space", len(data), h.FreeSpace())

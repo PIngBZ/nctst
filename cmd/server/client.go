@@ -82,7 +82,7 @@ func (h *Client) smuxLoop() {
 }
 
 func (h *Client) connectTarget(stream *smux.Stream) {
-	target, err := net.DialTimeout("tcp", config.Target, time.Second*3)
+	target, err := net.DialTimeout("tcp", config.Target, time.Second*5)
 	if err != nil {
 		log.Printf("connectTarget: %d %+v\n", h.ID, err)
 		stream.Close()

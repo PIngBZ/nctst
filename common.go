@@ -50,7 +50,7 @@ func SmuxConfig() *smux.Config {
 	return smuxConfig
 }
 
-var _copy_buf_pool = NewPool(1024 * 32)
+var _copy_buf_pool = NewPool(1024 * 512)
 
 func Transfer(p1, p2 io.ReadWriteCloser) {
 	streamCopy := func(to, from io.ReadWriteCloser) {

@@ -21,7 +21,7 @@ func WaittingLogin() {
 				return
 			}
 		}
-		log.Println("wait 5s to retry ...")
+		log.Println("login failed, wait 5s to retry ...")
 		time.Sleep(time.Second * 5)
 	}
 }
@@ -39,17 +39,18 @@ func tryLogin(addr string) error {
 		return err
 	}
 
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(time.Second * 5))
+
 	if err = sendLogin(conn); err != nil {
-		conn.Close()
 		return err
 	}
 
 	if err = receiveLoginReply(conn); err != nil {
-		conn.Close()
 		return err
 	}
 
-	conn.Close()
 	return nil
 }
 
@@ -69,10 +70,12 @@ func receiveLoginReply(conn *net.TCPConn) error {
 	}
 
 	if nctst.GetCommandType(buf) != nctst.Cmd_loginReply {
+		buf.Release()
 		return errors.New("receiveLoginReply type error")
 	}
 
 	command, err := nctst.ReadCommand(buf)
+	buf.Release()
 	if err != nil {
 		return err
 	}
