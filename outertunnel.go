@@ -105,7 +105,7 @@ func (h *OuterTunnel) daemon() {
 		case <-h.Die:
 			return
 		case <-ticker.C:
-			//h.startPing()
+			h.startPing()
 		case command := <-h.commandReceiveChan:
 			h.onReceiveCommand(command)
 		}
