@@ -3,6 +3,7 @@ package nctst
 import (
 	"log"
 	"sync/atomic"
+	"time"
 )
 
 type Duplicater struct {
@@ -46,22 +47,22 @@ func (h *Duplicater) daemon() {
 			prepare := item
 			item = nil
 
-			// 	after := time.After(time.Millisecond * 5)
-			// outer:
-			// 	for prepare.Size() < 1024 {
-			// 		select {
-			// 		case next := <-h.input:
-			// 			if next.Size() < 128 {
-			// 				prepare.Append(next)
-			// 				next.Release()
-			// 			} else {
-			// 				item = next
-			// 				break outer
-			// 			}
-			// 		case <-after:
-			// 			break outer
-			// 		}
-			// 	}
+			after := time.After(time.Millisecond * 5)
+		outer:
+			for prepare.Size() < 1024 {
+				select {
+				case next := <-h.input:
+					if next.Size() < 128 {
+						prepare.Append(next)
+						next.Release()
+					} else {
+						item = next
+						break outer
+					}
+				case <-after:
+					break outer
+				}
+			}
 
 			h.updateTunnelsList()
 			sent := false
