@@ -46,7 +46,7 @@ func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan 
 	h.receiveChan = receiveChan
 	h.sendChan = sendChan
 	h.outputChan = make(chan *BufItem)
-	h.DirectChan = make(chan *BufItem)
+	h.DirectChan = make(chan *BufItem, 8)
 
 	h.Die = make(chan struct{})
 

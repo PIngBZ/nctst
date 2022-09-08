@@ -43,46 +43,36 @@ func (h *Duplicater) daemon() {
 
 	for item := range h.input {
 		if item.Size() < 128 {
-			prepare := item
-			item = nil
-
-		outer:
-			for prepare.Size() < 1024 {
-				select {
-				case next := <-h.input:
-					if next.Size() < 128 {
-						prepare.Append(next)
-						next.Release()
-					} else {
-						item = next
-						break outer
-					}
-				default:
-					break outer
-				}
-			}
-
 			h.updateTunnelsList()
 			sent := false
-			cp := prepare.Copy()
-			for _, tunnel := range h.tunnels {
+			cp := item.Copy()
+			for i, tunnel := range h.tunnels {
 				select {
 				case tunnel.DirectChan <- cp:
-					cp = prepare.Copy()
+					if i == len(h.tunnels)-1 {
+						cp = nil
+					} else if i == len(h.tunnels)-2 {
+						cp = item
+						item = nil
+					} else {
+						cp = item.Copy()
+					}
 					sent = true
 				default:
 				}
 			}
-			cp.Release()
 			if !sent {
-				h.Output <- prepare
-			} else {
-				prepare.Release()
+				h.Output <- item
+				item = nil
 			}
-		}
-
-		if item != nil {
-			if item.Size() < 1024 {
+			if cp != nil {
+				cp.Release()
+			}
+			if item != nil {
+				item.Release()
+			}
+		} else {
+			if item.Size() < 512 {
 				num := int(atomic.LoadInt32(&h.num))
 				for i := 1; i < num; i++ {
 					h.Output <- item.Copy()
