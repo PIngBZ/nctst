@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/haochen233/socks5"
+	"github.com/PIngBZ/socks5"
 )
 
 var (
@@ -42,8 +42,9 @@ func (h *ProxyConnector) connect() bool {
 	log.Printf("ProxyConnector connecting %d %d\n", h.ProxyID, h.ID)
 
 	client := socks5.Client{
-		ProxyAddr: h.Address,
-		Timeout:   time.Second * 5,
+		ProxyAddr:        h.Address,
+		DialTimeout:      time.Second * 5,
+		HandshakeTimeout: time.Second * 5,
 		Auth: map[socks5.METHOD]socks5.Authenticator{
 			socks5.NO_AUTHENTICATION_REQUIRED: &socks5.NoAuth{},
 		},

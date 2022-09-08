@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/socks5"
 	"github.com/xtaci/smux"
 )
 
@@ -16,13 +18,14 @@ type Client struct {
 	ID             uint
 	kcp            *nctst.Kcp
 	smux           *smux.Session
+	listener       net.Listener
 	duplicater     *nctst.Duplicater
 	tunnels        map[uint]*nctst.OuterTunnel
 	tunnelsLocker  sync.Mutex
 	tunnelsListVer uint32
 }
 
-func NewClient(uuid string, id uint, compress bool, duplicateNum int) *Client {
+func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType string) *Client {
 	h := &Client{}
 	h.UUID = uuid
 	h.ID = id
@@ -32,6 +35,7 @@ func NewClient(uuid string, id uint, compress bool, duplicateNum int) *Client {
 	} else {
 		h.smux, _ = smux.Server(h.kcp, nctst.SmuxConfig())
 	}
+	h.listener = NewSmuxWrapper(h.smux)
 
 	h.tunnels = make(map[uint]*nctst.OuterTunnel)
 	h.tunnelsListVer = 100
@@ -49,7 +53,12 @@ func NewClient(uuid string, id uint, compress bool, duplicateNum int) *Client {
 		}
 		return atomic.LoadUint32(&h.tunnelsListVer), tunnels
 	})
-	go h.smuxLoop()
+
+	if tarType == "socks5" {
+		go h.listenAndServeSocks5()
+	} else {
+		go h.listenAndServeTCP()
+	}
 
 	log.Printf("new client %s %d %d\n", uuid, id, duplicateNum)
 	return h
@@ -68,29 +77,52 @@ func (h *Client) AddConn(conn *net.TCPConn, tunnelID uint, connID uint) {
 	tunnel.AddConn(conn, connID)
 }
 
-func (h *Client) smuxLoop() {
+func (h *Client) listenAndServeTCP() {
 	for {
-		stream, err := h.smux.AcceptStream()
+		stream, err := h.listener.Accept()
 		if err != nil {
 			log.Printf("accept stream: %d %+v\n", h.ID, err)
 			continue
 		}
 
-		log.Printf("AcceptStream %d %d\n", h.ID, stream.ID())
+		log.Printf("AcceptStream %d %d\n", h.ID, stream.(*smux.Stream).ID())
 		go h.connectTarget(stream)
 	}
 }
 
-func (h *Client) connectTarget(stream *smux.Stream) {
-	target, err := net.DialTimeout("tcp", config.Target, time.Second*5)
+func (h *Client) connectTarget(conn net.Conn) {
+	target, err := net.DialTimeout("tcp", config.Target, time.Second*3)
 	if err != nil {
 		log.Printf("connectTarget: %d %+v\n", h.ID, err)
-		stream.Close()
+		conn.Close()
 		return
 	}
 
 	target.SetDeadline(time.Time{})
-	stream.SetDeadline(time.Time{})
+	conn.SetDeadline(time.Time{})
 
-	go nctst.Transfer(stream, target)
+	go nctst.Transfer(conn, target)
+}
+
+func (h *Client) listenAndServeSocks5() {
+	srv := &socks5.Server{
+		Addr:                  config.Listen,
+		Authenticators:        nil,
+		DisableSocks4:         true,
+		Transporter:           h,
+		DialTimeout:           time.Second * 5,
+		HandshakeReadTimeout:  time.Second * 5,
+		HandshakeWriteTimeout: time.Second * 5,
+	}
+
+	srv.Serve(h.listener)
+}
+
+func (t *Client) TransportStream(client io.ReadWriteCloser, remote io.ReadWriteCloser) <-chan error {
+	nctst.Transfer(client, remote)
+	return nil
+}
+
+func (t *Client) TransportUDP(server *socks5.UDPConn, request *socks5.Request) error {
+	return nil
 }

@@ -5,6 +5,7 @@
     "proxies": ["127.0.0.1:8889", "127.0.0.1:8899", "127.0.0.1:8889", "127.0.0.1:8899"],
     "connperproxy": 5,
     "compress": false,
+    "tartype": "socks5",
     "key": "123",
     "duplicate": 2
 }

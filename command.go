@@ -168,6 +168,7 @@ type CommandLogin struct {
 	PassWord   string
 	Duplicate  int
 	Compress   bool
+	TarType    string
 	Key        string
 }
 

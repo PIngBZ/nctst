@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/haochen233/socks5"
+	"github.com/PIngBZ/socks5"
 )
 
 func WaittingLogin() {
@@ -59,6 +59,7 @@ func sendLogin(conn *net.TCPConn) error {
 	cmd.ClientUUID = UUID
 	cmd.Duplicate = config.Duplicate
 	cmd.Compress = config.Compress
+	cmd.TarType = config.TarType
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }

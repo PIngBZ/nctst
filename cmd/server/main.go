@@ -99,7 +99,7 @@ func onNewConnection(conn *net.TCPConn) {
 			return
 		}
 
-		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate)
+		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
 		nextClientID++
 		clients[cmd.ClientUUID] = client
 		clientsLocker.Unlock()
