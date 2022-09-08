@@ -3,6 +3,7 @@ package nctst
 import (
 	"log"
 	"sync/atomic"
+	"time"
 )
 
 type Duplicater struct {
@@ -45,6 +46,8 @@ func (h *Duplicater) daemon() {
 		if item.Size() < 128 {
 			prepare := item
 			item = nil
+
+			after := time.After(time.Millisecond * 25)
 		outer:
 			for prepare.Size() < 1024 {
 				select {
@@ -56,7 +59,7 @@ func (h *Duplicater) daemon() {
 						item = next
 						break outer
 					}
-				default:
+				case <-after:
 					break outer
 				}
 			}

@@ -149,7 +149,7 @@ func (h *OuterTunnel) onReceivePing(ping *CommandPing) {
 		ping.Step = 2
 		h.sendCommand(&Command{Type: Cmd_ping, Item: ping})
 	case 2:
-		h.Ping = (int64(Min(int(h.Ping), 5000)) + time.Now().UnixNano()/1e6 - ping.SendTime) / 2
+		h.Ping = time.Now().UnixNano()/1e6 - ping.SendTime
 		log.Printf("updatePing: client %d tunnel %d id %d ping %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
 	}
 }
