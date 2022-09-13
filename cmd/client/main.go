@@ -23,6 +23,8 @@ var (
 	proxies    = []*Proxy{}
 	tunnels    = make([]*nctst.OuterTunnel, 0)
 	duplicater *nctst.Duplicater
+
+	connKey string
 )
 
 func init() {
@@ -39,7 +41,7 @@ func init() {
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
 
-	go nctst.CommandDaemon()
+	go nctst.CommandDaemon(config.Key)
 }
 
 func main() {

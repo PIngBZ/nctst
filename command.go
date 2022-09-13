@@ -14,6 +14,7 @@ var (
 
 	commandPublishObservers = make([]chan *Command, 0)
 	commandPublishLocker    = sync.Mutex{}
+	commandXorKey           string
 )
 
 type CommandType uint32
@@ -51,7 +52,8 @@ func RemoveCommandObserver(observer chan *Command) {
 	}
 }
 
-func CommandDaemon() {
+func CommandDaemon(key string) {
+	commandXorKey = key
 	for buf := range CommandReceiveChan {
 		if cmd, err := ReadCommand(buf); err == nil {
 			publishCommand(cmd)
@@ -81,6 +83,7 @@ func SendCommand(conn *net.TCPConn, command *Command) error {
 		return err
 	}
 	data := []byte(js)
+	Xor(data, []byte(commandXorKey))
 
 	if err := WriteUInt(conn, uint32(len(js)+8)); err != nil {
 		return err
@@ -133,6 +136,7 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 	}
 
 	t, _ := ReadUInt(buf)
+	Xor(buf.Data(), []byte(commandXorKey))
 	s := string(buf.Data())
 
 	var obj interface{}
@@ -172,9 +176,18 @@ type CommandLogin struct {
 	Key        string
 }
 
+type LoginReply_Code uint32
+
+const (
+	LoginReply_success LoginReply_Code = iota
+	LoginReply_errAuthority
+)
+
 type CommandLoginReply struct {
+	Code       LoginReply_Code
 	ClientUUID string
 	ClientID   uint
+	ConnectKey string
 }
 
 type CommandHandshake struct {
@@ -182,6 +195,7 @@ type CommandHandshake struct {
 	ClientID   uint
 	TunnelID   uint
 	ConnID     uint
+	ConnectKey string
 	Key        string
 }
 

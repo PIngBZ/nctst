@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"io"
 	"log"
 	"net"
@@ -14,8 +16,10 @@ import (
 )
 
 type Client struct {
-	UUID           string
-	ID             uint
+	UUID    string
+	ID      uint
+	ConnKey string
+
 	kcp            *nctst.Kcp
 	smux           *smux.Session
 	listener       net.Listener
@@ -29,6 +33,9 @@ func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType st
 	h := &Client{}
 	h.UUID = uuid
 	h.ID = id
+	k := md5.Sum([]byte(uuid))
+	h.ConnKey = hex.EncodeToString(k[:])
+
 	h.kcp = nctst.NewKcp(id)
 	if compress {
 		h.smux, _ = smux.Server(nctst.NewCompStream(h.kcp), nctst.SmuxConfig())

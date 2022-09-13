@@ -1,0 +1,108 @@
+package main
+
+import (
+	"context"
+	"log"
+	"net/http"
+
+	"github.com/PIngBZ/nctst"
+	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/render"
+)
+
+var ()
+
+func init() {
+	go UserMgr.daemon()
+}
+
+type UserInfo struct {
+	ID       string
+	Name     string
+	Password string
+	Hash     string
+}
+
+type UserManager struct {
+}
+
+func (h *UserManager) CheckUserPassword(username, hash string) bool {
+	var count int
+	err := DB.QueryRow("select count(*) from userinfo where username=? and password=?", username, hash).Scan(&count)
+	if err != nil {
+		log.Printf("db query user error %s %+v\n", username, err)
+		return false
+	}
+	return count != 0
+}
+
+func (h *UserManager) daemon() {
+	r := chi.NewRouter()
+
+	r.Use(middleware.Recoverer)
+	r.Use(render.SetContentType(render.ContentTypeJSON))
+	r.Use(middleware.BasicAuth("Need Login", map[string]string{
+		"nct": "mutopia",
+	}))
+
+	r.Route("/users", func(r chi.Router) {
+		r.Get("/", h.ListUsers)
+
+		r.Route("/{articleID}", func(r chi.Router) {
+			r.Use(h.UserCtx)
+			r.Get("/", h.GetUser)
+			r.Put("/", h.UpdateUser)
+			r.Delete("/", h.DeleteUser)
+		})
+	})
+
+	http.ListenAndServe(config.AdminListen, r)
+}
+
+func (h *UserManager) UserCtx(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var user *UserInfo
+		var err error
+		if username := chi.URLParam(r, "username"); username != "" {
+			user, err = h.dbGetUser(username)
+		} else {
+			render.Render(w, r, nctst.ErrNotFound)
+			return
+		}
+		if err != nil {
+			render.Render(w, r, nctst.ErrNotFound)
+			return
+		}
+		ctx := context.WithValue(r.Context(), "user", user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
+	var id, name, pwd string
+	if err := DB.QueryRow("select id, password from userinfo where username=?", username).Scan(&id, &name, &pwd); err != nil {
+		return nil, err
+	}
+	user := &UserInfo{}
+	user.ID = id
+	user.Name = username
+	user.Hash = pwd
+	return user, nil
+}
+
+func (h *UserManager) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (h *UserManager) GetUser(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (h *UserManager) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (h *UserManager) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+}

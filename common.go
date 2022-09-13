@@ -1,7 +1,10 @@
 package nctst
 
 import (
+	"crypto/md5"
+	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -79,6 +82,14 @@ func Max(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func Xor(data []byte, key []byte) {
+	kn := 0
+	for i, v := range data {
+		data[i] = v ^ key[kn]
+		kn = (kn + 1) % len(key)
+	}
 }
 
 func ToUint(data []byte) uint32 {
@@ -174,4 +185,11 @@ func ReadLBuf(reader io.Reader) (*BufItem, error) {
 		return nil, err
 	}
 	return buf, nil
+}
+
+func HashPassword(username, password string) string {
+	p := sha1.Sum([]byte(password))
+	k := append([]byte(username), p[:]...)
+	m := md5.Sum([]byte(k))
+	return string(hex.EncodeToString(m[:]))
 }

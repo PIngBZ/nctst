@@ -94,6 +94,7 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	cmd.ClientID = ClientID
 	cmd.TunnelID = h.tunnel.ID
 	cmd.ConnID = h.ID
+	cmd.ConnectKey = connKey
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }

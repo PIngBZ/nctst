@@ -16,6 +16,8 @@ var (
 	configFile string
 	config     *Config
 
+	UserMgr = &UserManager{}
+
 	clients            = make(map[string]*Client)
 	clientsLocker      = sync.Mutex{}
 	nextClientID  uint = uint(rand.Intn(89999) + 10000)
@@ -35,7 +37,7 @@ func init() {
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
 
-	go nctst.CommandDaemon()
+	go nctst.CommandDaemon(config.Key)
 }
 
 func main() {
@@ -90,6 +92,11 @@ func onNewConnection(conn *net.TCPConn) {
 			return
 		}
 
+		if !UserMgr.CheckUserPassword(cmd.UserName, cmd.PassWord) {
+			sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthority)
+			return
+		}
+
 		clientsLocker.Lock()
 		client, ok := clients[cmd.ClientUUID]
 		if ok {
@@ -104,7 +111,7 @@ func onNewConnection(conn *net.TCPConn) {
 		clients[cmd.ClientUUID] = client
 		clientsLocker.Unlock()
 
-		sendLoginReply(conn, client.UUID, client.ID)
+		sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, nctst.LoginReply_success)
 		conn.Close()
 		log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
 	} else if command.Type == nctst.Cmd_handshake {
@@ -127,6 +134,12 @@ func onNewConnection(conn *net.TCPConn) {
 			return
 		}
 
+		if cmd.ConnectKey != client.ConnKey {
+			conn.Close()
+			log.Printf("handshake key error: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
+			return
+		}
+
 		sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_success)
 
 		conn.SetDeadline(time.Time{})
@@ -138,10 +151,12 @@ func onNewConnection(conn *net.TCPConn) {
 	}
 }
 
-func sendLoginReply(conn *net.TCPConn, uuid string, id uint) {
+func sendLoginReply(conn *net.TCPConn, uuid string, id uint, connKey string, code nctst.LoginReply_Code) {
 	cmd := &nctst.CommandLoginReply{}
 	cmd.ClientID = id
 	cmd.ClientUUID = uuid
+	cmd.ConnectKey = connKey
+	cmd.Code = code
 	nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_loginReply, Item: cmd})
 }
 

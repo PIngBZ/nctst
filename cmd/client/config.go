@@ -7,6 +7,8 @@ import (
 )
 
 type Config struct {
+	UserName     string   `json:"username"`
+	PassWord     string   `json:"password"`
 	Listen       string   `json:"listen"`
 	ServerIP     string   `json:"serverIP"`
 	ServerPort   string   `json:"serverPort"`

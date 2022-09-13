@@ -12,8 +12,13 @@ require (
 )
 
 require (
+	github.com/ajg/form v1.5.1 // indirect
+	github.com/go-chi/chi v1.5.4 // indirect
+	github.com/go-chi/chi/v5 v5.0.7 // indirect
+	github.com/go-chi/render v1.0.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.14 // indirect
 	github.com/klauspost/reedsolomon v1.10.0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/templexxx/cpufeat v0.0.0-20180724012125-cef66df7f161 // indirect
 	github.com/templexxx/xor v0.0.0-20191217153810-f85b25db303b // indirect
 	github.com/tjfoc/gmsm v1.4.1 // indirect

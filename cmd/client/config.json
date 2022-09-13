@@ -1,4 +1,6 @@
 {
+    "username": "",
+    "password": "",
     "listen": ":6101",
     "serverIP": "127.0.0.1",
     "serverPort": "8000",

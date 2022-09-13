@@ -43,7 +43,7 @@ func tryLogin(addr string) error {
 
 	conn.SetDeadline(time.Now().Add(time.Second * 5))
 
-	if err = sendLogin(conn); err != nil {
+	if err = sendLoginCommand(conn); err != nil {
 		return err
 	}
 
@@ -54,8 +54,10 @@ func tryLogin(addr string) error {
 	return nil
 }
 
-func sendLogin(conn *net.TCPConn) error {
+func sendLoginCommand(conn *net.TCPConn) error {
 	cmd := &nctst.CommandLogin{}
+	cmd.UserName = config.UserName
+	cmd.PassWord = nctst.HashPassword(config.UserName, config.PassWord)
 	cmd.ClientUUID = UUID
 	cmd.Duplicate = config.Duplicate
 	cmd.Compress = config.Compress
@@ -83,6 +85,7 @@ func receiveLoginReply(conn *net.TCPConn) error {
 	cmd := command.Item.(*nctst.CommandLoginReply)
 
 	ClientID = cmd.ClientID
+	connKey = cmd.ConnectKey
 
 	return nil
 }
