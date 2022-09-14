@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -88,7 +89,7 @@ func (h *ProxyConnector) connect() bool {
 	return true
 }
 
-func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
+func (h *ProxyConnector) sendHandshake(conn io.Writer) error {
 	cmd := &nctst.CommandHandshake{}
 	cmd.ClientUUID = UUID
 	cmd.ClientID = ClientID
@@ -99,7 +100,7 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }
 
-func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
+func (h *ProxyConnector) receiveHandshakeReply(conn io.Reader) error {
 	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
 		return err

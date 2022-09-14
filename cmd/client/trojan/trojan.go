@@ -5,9 +5,11 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
+	"time"
 
 	"github.com/PIngBZ/nctst"
 )
@@ -20,7 +22,8 @@ type TrojanClient struct {
 	TargetHost string
 	TargetPort int
 
-	Conn net.Conn
+	Conn     net.Conn
+	TestPing uint
 
 	headerWritten bool
 }
@@ -36,6 +39,9 @@ func NewTrojanClient(serverName string, serverIP string, serverPort int, targetH
 }
 
 func (h *TrojanClient) Connect() error {
+	if h.Conn != nil {
+		return errors.New("already connect")
+	}
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
 		ServerName:         h.ServerName,
@@ -69,7 +75,14 @@ func (h *TrojanClient) Read(p []byte) (int, error) {
 }
 
 func (h *TrojanClient) Close() error {
-	return h.Conn.Close()
+	if h.Conn == nil {
+		return nil
+	}
+
+	err := h.Conn.Close()
+	h.Conn = nil
+	h.headerWritten = false
+	return err
 }
 
 func (h *TrojanClient) writeWithHeader(payload []byte) (int, error) {
@@ -118,4 +131,51 @@ func (h *TrojanClient) writeMetadata(w io.Writer) (int64, error) {
 
 	n, err = w.Write(buf.Bytes())
 	return int64(n), err
+}
+
+func (h *TrojanClient) Ping(finished func(*TrojanClient, uint, error)) {
+	defer h.Close()
+
+	if err := h.Connect(); err != nil {
+		finished(h, 0, err)
+		return
+	}
+
+	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_idle, Item: &nctst.CommandIdle{}}); err != nil {
+		finished(h, 0, err)
+		return
+	}
+
+	time.Sleep(time.Millisecond * 100)
+
+	cmd := &nctst.CommandTestPing{}
+	cmd.SendTime = time.Now().UnixNano() / 1e6
+	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
+		finished(h, 0, err)
+		return
+	}
+
+	buf, err := nctst.ReadLBuf(h)
+	if err != nil {
+		finished(h, 0, err)
+		return
+	}
+
+	command, err := nctst.ReadCommand(buf)
+	if err != nil {
+		finished(h, 0, err)
+		return
+	}
+
+	if command.Type != nctst.Cmd_testping {
+		finished(h, 0, errors.New("testping ret type error"))
+		return
+	}
+
+	ret := command.Item.(*nctst.CommandTestPing)
+
+	ping := uint(time.Now().UnixNano()/1e6 - ret.SendTime)
+
+	h.TestPing = ping
+	finished(h, ping, nil)
 }

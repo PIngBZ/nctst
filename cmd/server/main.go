@@ -82,73 +82,84 @@ func onNewConnection(conn *net.TCPConn) {
 		conn.Close()
 		return
 	}
-
-	if command.Type == nctst.Cmd_login {
-		cmd := command.Item.(*nctst.CommandLogin)
-
-		if cmd.Key != config.Key {
-			conn.Close()
-			log.Println("login error key: " + cmd.Key)
-			return
-		}
-
-		if !UserMgr.CheckUserPassword(cmd.UserName, cmd.PassWord) {
-			sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthority)
-			return
-		}
-
-		clientsLocker.Lock()
-		client, ok := clients[cmd.ClientUUID]
-		if ok {
-			clientsLocker.Unlock()
-			conn.Close()
-			log.Println("login uuid exist: " + cmd.ClientUUID)
-			return
-		}
-
-		client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
-		nextClientID++
-		clients[cmd.ClientUUID] = client
-		clientsLocker.Unlock()
-
-		sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, nctst.LoginReply_success)
-		conn.Close()
-		log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
+	if command.Type == nctst.Cmd_idle {
+		// do nothing
+	} else if command.Type == nctst.Cmd_testping {
+		nctst.SendCommand(conn, command)
+	} else if command.Type == nctst.Cmd_login {
+		doLogin(conn, command)
 	} else if command.Type == nctst.Cmd_handshake {
-		cmd := command.Item.(*nctst.CommandHandshake)
-
-		if cmd.Key != config.Key {
-			log.Println("handshake error key: " + cmd.Key)
-			conn.Close()
-			return
-		}
-
-		clientsLocker.Lock()
-		client, ok := clients[cmd.ClientUUID]
-		clientsLocker.Unlock()
-
-		if !ok {
-			sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_needlogin)
-			conn.Close()
-			log.Printf("handshake not login: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
-			return
-		}
-
-		if cmd.ConnectKey != client.ConnKey {
-			conn.Close()
-			log.Printf("handshake key error: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
-			return
-		}
-
-		sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_success)
-
-		conn.SetDeadline(time.Time{})
-
-		client.AddConn(conn, cmd.TunnelID, cmd.ConnID)
+		doHandshake(conn, command)
 	} else {
 		conn.Close()
 		log.Printf("onNewConnection cmd type err: %d\n", command.Type)
 	}
+}
+
+func doLogin(conn *net.TCPConn, command *nctst.Command) {
+	cmd := command.Item.(*nctst.CommandLogin)
+
+	if cmd.Key != config.Key {
+		conn.Close()
+		log.Println("login error key: " + cmd.Key)
+		return
+	}
+
+	if !UserMgr.CheckUserPassword(cmd.UserName, cmd.PassWord) {
+		sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthority)
+		return
+	}
+
+	clientsLocker.Lock()
+	client, ok := clients[cmd.ClientUUID]
+	if ok {
+		clientsLocker.Unlock()
+		conn.Close()
+		log.Println("login uuid exist: " + cmd.ClientUUID)
+		return
+	}
+
+	client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
+	nextClientID++
+	clients[cmd.ClientUUID] = client
+	clientsLocker.Unlock()
+
+	sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, nctst.LoginReply_success)
+	conn.Close()
+	log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
+}
+
+func doHandshake(conn *net.TCPConn, command *nctst.Command) {
+	cmd := command.Item.(*nctst.CommandHandshake)
+
+	if cmd.Key != config.Key {
+		log.Println("handshake error key: " + cmd.Key)
+		conn.Close()
+		return
+	}
+
+	clientsLocker.Lock()
+	client, ok := clients[cmd.ClientUUID]
+	clientsLocker.Unlock()
+
+	if !ok {
+		sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_needlogin)
+		conn.Close()
+		log.Printf("handshake not login: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
+		return
+	}
+
+	if cmd.ConnectKey != client.ConnKey {
+		conn.Close()
+		log.Printf("handshake key error: %s %d %d %d\n", cmd.ClientUUID, cmd.ClientID, cmd.TunnelID, cmd.ConnID)
+		return
+	}
+
+	sendHandshakeReply(conn, cmd.ClientUUID, nctst.HandshakeReply_success)
+
+	conn.SetDeadline(time.Time{})
+
+	client.AddConn(conn, cmd.TunnelID, cmd.ConnID)
 }
 
 func sendLoginReply(conn *net.TCPConn, uuid string, id uint, connKey string, code nctst.LoginReply_Code) {

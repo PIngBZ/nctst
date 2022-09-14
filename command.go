@@ -3,8 +3,8 @@ package nctst
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"net"
 	"sync"
 )
 
@@ -24,6 +24,8 @@ const (
 
 	Cmd_none
 
+	Cmd_idle
+	Cmd_testping
 	Cmd_login
 	Cmd_loginReply
 	Cmd_handshake
@@ -76,7 +78,7 @@ func publishCommand(cmd *Command) {
 	}
 }
 
-func SendCommand(conn *net.TCPConn, command *Command) error {
+func SendCommand(conn io.Writer, command *Command) error {
 	js, err := ToJson(command.Item)
 
 	if err != nil {
@@ -141,6 +143,10 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 
 	var obj interface{}
 	switch CommandType(t) {
+	case Cmd_idle:
+		obj = &CommandIdle{}
+	case Cmd_testping:
+		obj = &CommandTestPing{}
 	case Cmd_login:
 		obj = &CommandLogin{}
 	case Cmd_loginReply:
@@ -164,6 +170,14 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 type Command struct {
 	Type CommandType
 	Item interface{}
+}
+
+type CommandIdle struct {
+	Payload string
+}
+
+type CommandTestPing struct {
+	SendTime int64
 }
 
 type CommandLogin struct {
