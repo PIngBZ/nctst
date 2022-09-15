@@ -42,43 +42,33 @@ func (h *Duplicater) GetNum() int {
 func (h *Duplicater) daemon() {
 
 	for item := range h.input {
-		if item.Size() < 128 {
-			h.updateTunnelsList()
-			sent := false
-			cp := item.Copy()
-			for i, tunnel := range h.tunnels {
-				select {
-				case tunnel.DirectChan <- cp:
-					if i == len(h.tunnels)-1 {
-						cp = nil
-					} else if i == len(h.tunnels)-2 {
-						cp = item
-						item = nil
-					} else {
-						cp = item.Copy()
-					}
-					sent = true
-				default:
+		h.updateTunnelsList()
+		sent := false
+		cp := item.Copy()
+		for i, tunnel := range h.tunnels {
+			select {
+			case tunnel.DirectChan <- cp:
+				if i == len(h.tunnels)-1 {
+					cp = nil
+				} else if i == len(h.tunnels)-2 {
+					cp = item
+					item = nil
+				} else {
+					cp = item.Copy()
 				}
+				sent = true
+			default:
 			}
-			if !sent {
-				h.Output <- item
-				item = nil
-			}
-			if cp != nil {
-				cp.Release()
-			}
-			if item != nil {
-				item.Release()
-			}
-		} else {
-			if item.Size() < 512 {
-				num := int(atomic.LoadInt32(&h.num))
-				for i := 1; i < num; i++ {
-					h.Output <- item.Copy()
-				}
-			}
+		}
+		if !sent {
 			h.Output <- item
+			item = nil
+		}
+		if cp != nil {
+			cp.Release()
+		}
+		if item != nil {
+			item.Release()
 		}
 	}
 }
