@@ -59,6 +59,16 @@ func main() {
 func onNewConnection(conn *net.TCPConn) {
 	conn.SetDeadline(time.Now().Add(time.Second * 5))
 
+	if k, err := nctst.ReadUInt(conn); err != nil {
+		conn.Close()
+		log.Printf("onNewConnection ReadKey err: %+v\n", err)
+		return
+	} else if k != nctst.NEW_CONNECTION_KEY {
+		conn.Close()
+		log.Println("onNewConnection error key")
+		return
+	}
+
 	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
 		conn.Close()

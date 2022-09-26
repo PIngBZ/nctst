@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrorNeedLogin = errors.New("Error Need Login")
+	ErrorNeedLogin = errors.New("error need login")
 )
 
 type ProxyConnector struct {
@@ -88,6 +88,10 @@ func (h *ProxyConnector) connect() bool {
 }
 
 func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
+	if err := nctst.WriteUInt(conn, nctst.NEW_CONNECTION_KEY); err != nil {
+		return err
+	}
+
 	cmd := &nctst.CommandHandshake{}
 	cmd.ClientUUID = UUID
 	cmd.ClientID = ClientID
@@ -138,8 +142,6 @@ func (h *ProxyConnector) daemon() {
 
 func (h *ProxyConnector) reconnect() bool {
 	log.Printf("ProxyConnector waiting 5s to reconnect %d %d\n", h.ProxyID, h.ID)
-	select {
-	case <-time.After(time.Second * 5):
-		return h.connect()
-	}
+	<-time.After(time.Second * 5)
+	return h.connect()
 }
