@@ -55,6 +55,10 @@ func tryLogin(addr string) error {
 }
 
 func sendLogin(conn *net.TCPConn) error {
+	if err := nctst.WriteUInt(conn, nctst.NEW_CONNECTION_KEY); err != nil {
+		return err
+	}
+
 	cmd := &nctst.CommandLogin{}
 	cmd.ClientUUID = UUID
 	cmd.Duplicate = config.Duplicate
