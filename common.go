@@ -147,7 +147,7 @@ func ReadLString(reader io.Reader) (string, error) {
 		return "", err
 	}
 	if l > 1024*1024 {
-		return "", errors.New("can not read string more than 1M")
+		return "", errors.New("ReadLString can not read string more than 1M")
 	}
 
 	buf := make([]byte, l)
@@ -165,7 +165,7 @@ func ReadLBuf(reader io.Reader) (*BufItem, error) {
 	}
 
 	if l == 0 || l > MAX_TCP_DATA_INTERNET_LEN {
-		return nil, fmt.Errorf("receiveLoop read len error")
+		return nil, fmt.Errorf("ReadLBuf read len error")
 	}
 
 	buf := DataBufPool.Get()

@@ -65,7 +65,7 @@ func onNewConnection(conn *net.TCPConn) {
 		return
 	} else if k != nctst.NEW_CONNECTION_KEY {
 		conn.Close()
-		log.Println("onNewConnection error key")
+		log.Printf("onNewConnection error key %d\n", k)
 		return
 	}
 
