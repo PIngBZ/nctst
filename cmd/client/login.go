@@ -15,7 +15,7 @@ func WaittingLogin() {
 	for {
 		for _, serverIP := range config.Proxies {
 			if err := tryLogin(serverIP); err != nil {
-				log.Printf("try login failed %+v\n", err)
+				log.Printf("try login failed %s %+v\n", serverIP, err)
 			} else {
 				log.Printf("login success %d\n", ClientID)
 				return
