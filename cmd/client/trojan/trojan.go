@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"time"
 
@@ -60,7 +59,7 @@ func (h *TrojanClient) Write(p []byte) (int, error) {
 	if !h.headerWritten {
 		n, err := h.writeWithHeader(p)
 		if err != nil {
-			return 0, fmt.Errorf("trojan failed to flush header with payload: %+v\n", err)
+			return 0, fmt.Errorf("trojan failed to flush header with payload: %+v", err)
 		}
 		return n, nil
 	}
@@ -112,25 +111,16 @@ func (h *TrojanClient) passwordHash() []byte {
 	return []byte(str)
 }
 
-func (h *TrojanClient) writeMetadata(w io.Writer) (int64, error) {
-	buf := bytes.NewBuffer(make([]byte, 0, 64))
+func (h *TrojanClient) writeMetadata(buf *bytes.Buffer) {
 	buf.WriteByte(byte(1))
+	buf.WriteByte(byte(3))
 
-	_, err := buf.Write([]byte{byte(3)})
-	buf.Write([]byte{byte(len(h.TargetHost))})
-	_, err = buf.Write([]byte(h.TargetHost))
-	if err != nil {
-		return 0, err
-	}
+	buf.WriteByte(byte(len(h.TargetHost)))
+	buf.Write([]byte(h.TargetHost))
+
 	port := [2]byte{}
 	binary.BigEndian.PutUint16(port[:], uint16(h.TargetPort))
-	n, err := buf.Write(port[:])
-	if err != nil {
-		return 0, err
-	}
-
-	n, err = w.Write(buf.Bytes())
-	return int64(n), err
+	buf.Write(port[:])
 }
 
 func (h *TrojanClient) Ping(finished func(*TrojanClient, uint, error)) {
@@ -146,7 +136,7 @@ func (h *TrojanClient) Ping(finished func(*TrojanClient, uint, error)) {
 		return
 	}
 
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 500)
 
 	cmd := &nctst.CommandTestPing{}
 	cmd.SendTime = time.Now().UnixNano() / 1e6

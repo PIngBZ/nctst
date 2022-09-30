@@ -42,7 +42,7 @@ func AttachCommandObserver(observer chan *Command) {
 	commandPublishObservers = append(commandPublishObservers, observer)
 }
 
-func RemoveCommandObserver(observer chan *Command) {
+func DetachCommandObserver(observer chan *Command) {
 	commandPublishLocker.Lock()
 	defer commandPublishLocker.Unlock()
 
@@ -210,7 +210,6 @@ type CommandHandshake struct {
 	TunnelID   uint
 	ConnID     uint
 	ConnectKey string
-	Key        string
 }
 
 type HandshakeReply_Code uint32

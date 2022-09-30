@@ -40,7 +40,7 @@ func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn *net.TCPConn
 	go h.receiveLoop(conn, once)
 	go h.sendLoop(conn, once)
 
-	log.Printf("new connection %d %d %d\n", clientID, tunnelID, id)
+	log.Printf("OuterConnection.New %d %d %d\n", clientID, tunnelID, id)
 	return h
 }
 

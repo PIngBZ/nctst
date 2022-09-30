@@ -12,7 +12,7 @@ import (
 )
 
 var (
-	ErrorNeedLogin = errors.New("Error Need Login")
+	ErrorNeedLogin = errors.New("error need login")
 )
 
 type ProxyConnector struct {
@@ -22,7 +22,7 @@ type ProxyConnector struct {
 
 	tunnel *nctst.OuterTunnel
 
-	outerDieSignal chan struct{}
+	outerConnection *nctst.OuterConnection
 }
 
 func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTunnel) *ProxyConnector {
@@ -35,7 +35,7 @@ func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTu
 
 	go h.daemon()
 
-	log.Printf("new proxy connector %d %d\n", proxyID, id)
+	log.Printf("ProxyConnector.New %d %d\n", proxyID, id)
 	return h
 }
 
@@ -83,7 +83,7 @@ func (h *ProxyConnector) connect() bool {
 	}
 
 	conn.SetDeadline(time.Time{})
-	h.outerDieSignal = h.tunnel.AddConn(conn, h.ID)
+	h.outerConnection = h.tunnel.AddConn(conn, h.ID)
 
 	log.Printf("ProxyConnector connect success %d %d\n", h.ProxyID, h.ID)
 	return true
@@ -96,7 +96,6 @@ func (h *ProxyConnector) sendHandshake(conn io.Writer) error {
 	cmd.TunnelID = h.tunnel.ID
 	cmd.ConnID = h.ID
 	cmd.ConnectKey = connKey
-	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }
 
@@ -130,8 +129,8 @@ func (h *ProxyConnector) daemon() {
 	h.connect()
 	for {
 		select {
-		case <-h.outerDieSignal:
-			h.tunnel.Remove(h.ID)
+		case <-h.outerConnection.Die:
+			h.tunnel.RemoveConn(h.ID)
 			if !h.reconnect() {
 				return
 			}
@@ -141,8 +140,7 @@ func (h *ProxyConnector) daemon() {
 
 func (h *ProxyConnector) reconnect() bool {
 	log.Printf("ProxyConnector waiting 5s to reconnect %d %d\n", h.ProxyID, h.ID)
-	select {
-	case <-time.After(time.Second * 5):
-		return h.connect()
-	}
+
+	time.Sleep(time.Second * 5)
+	return h.connect()
 }

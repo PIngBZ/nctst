@@ -2,6 +2,7 @@ package nctst
 
 import (
 	"log"
+	"sync"
 	"sync/atomic"
 )
 
@@ -14,6 +15,9 @@ type Duplicater struct {
 
 	tunnelsListVer uint32
 	tunnels        []*OuterTunnel
+
+	die     chan struct{}
+	dieOnce sync.Once
 }
 
 func NewDuplicater(num int, input chan *BufItem, tunnelsListCallback func(uint32) (uint32, []*OuterTunnel)) *Duplicater {
@@ -27,7 +31,22 @@ func NewDuplicater(num int, input chan *BufItem, tunnelsListCallback func(uint32
 	h.num = int32(num)
 	go h.daemon()
 
+	log.Println("Duplicater.New")
 	return h
+}
+
+func (h *Duplicater) Close() {
+	var once bool
+	h.dieOnce.Do(func() {
+		close(h.die)
+		once = true
+	})
+
+	if !once {
+		return
+	}
+
+	log.Println("Duplicater.Close")
 }
 
 func (h *Duplicater) SetNum(num int) {
@@ -40,9 +59,11 @@ func (h *Duplicater) GetNum() int {
 }
 
 func (h *Duplicater) daemon() {
-
-	for item := range h.input {
-		if item.Size() < 128 {
+	for {
+		select {
+		case <-h.die:
+			return
+		case item := <-h.input:
 			h.updateTunnelsList()
 			sent := false
 			cp := item.Copy()
@@ -62,7 +83,14 @@ func (h *Duplicater) daemon() {
 				}
 			}
 			if !sent {
-				h.Output <- item
+				select {
+				case <-h.die:
+					cp.Release()
+					item.Release()
+					return
+				case h.Output <- item:
+				}
+
 				item = nil
 			}
 			if cp != nil {
@@ -71,14 +99,6 @@ func (h *Duplicater) daemon() {
 			if item != nil {
 				item.Release()
 			}
-		} else {
-			if item.Size() < 512 {
-				num := int(atomic.LoadInt32(&h.num))
-				for i := 1; i < num; i++ {
-					h.Output <- item.Copy()
-				}
-			}
-			h.Output <- item
 		}
 	}
 }

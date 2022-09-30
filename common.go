@@ -10,14 +10,17 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"github.com/xtaci/smux"
 )
 
 var (
-	DataBufPool = NewPool(DATA_BUF_SIZE)
+	DataBufPool          = NewPool(DATA_BUF_SIZE)
+	DelayCloseNum uint32 = 0
 )
 
 func CheckError(err error) {
@@ -192,4 +195,18 @@ func HashPassword(username, password string) string {
 	k := append([]byte(username), p[:]...)
 	m := md5.Sum([]byte(k))
 	return string(hex.EncodeToString(m[:]))
+}
+
+func DelayClose(conn io.Closer) {
+	if atomic.LoadUint32(&DelayCloseNum) > 1000 {
+		conn.Close()
+		return
+	}
+
+	atomic.AddUint32(&DelayCloseNum, 1)
+	go func() {
+		time.Sleep(time.Second * time.Duration(60+rand.Intn(60)))
+		conn.Close()
+		atomic.AddUint32(&DelayCloseNum, ^uint32(0))
+	}()
 }

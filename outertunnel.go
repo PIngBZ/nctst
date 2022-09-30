@@ -45,8 +45,8 @@ func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan 
 	h.commandReceiveChan = make(chan *Command, 8)
 	h.receiveChan = receiveChan
 	h.sendChan = sendChan
-	h.outputChan = make(chan *BufItem, 2)
-	h.DirectChan = make(chan *BufItem, 8)
+	h.outputChan = make(chan *BufItem)
+	h.DirectChan = make(chan *BufItem)
 
 	h.Die = make(chan struct{})
 
@@ -56,12 +56,29 @@ func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan 
 
 	AttachCommandObserver(h.commandReceiveChan)
 
-	log.Printf("new tunnel %d %d\n", clientID, id)
+	log.Printf("OuterTunnel.New %d %d\n", clientID, id)
 	return h
 }
 
-func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (dieSignal chan struct{}) {
-	h.Remove(id)
+func (h *OuterTunnel) Close() {
+	var once bool
+	h.dieOnce.Do(func() {
+		close(h.Die)
+		once = true
+	})
+
+	if !once {
+		return
+	}
+
+	DetachCommandObserver(h.commandReceiveChan)
+	h.RemoveAllConn()
+
+	log.Printf("OuterTunnel.Close %d %d\n", h.ClientID, h.ID)
+}
+
+func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (outerConn *OuterConnection) {
+	h.RemoveConn(id)
 
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
@@ -69,10 +86,10 @@ func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (dieSignal chan struct
 	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.receiveChan, h.outputChan, h.commandSendChan)
 	h.connections[id] = outer
 
-	return outer.Die
+	return outer
 }
 
-func (h *OuterTunnel) Remove(id uint) {
+func (h *OuterTunnel) RemoveConn(id uint) {
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
 
@@ -82,9 +99,21 @@ func (h *OuterTunnel) Remove(id uint) {
 	}
 }
 
+func (h *OuterTunnel) RemoveAllConn() {
+	h.connectionsLocker.Lock()
+	defer h.connectionsLocker.Unlock()
+
+	for _, v := range h.connections {
+		v.Close()
+	}
+	h.connections = make(map[uint]*OuterConnection)
+}
+
 func (h *OuterTunnel) transferLoop() {
 	for {
 		select {
+		case <-h.Die:
+			return
 		case buf := <-h.DirectChan:
 			h.outputChan <- buf
 		default:
@@ -127,6 +156,8 @@ func (h *OuterTunnel) startPing() {
 
 func (h *OuterTunnel) sendCommand(command *Command) {
 	select {
+	case <-h.Die:
+		return
 	case h.commandSendChan <- command:
 	default:
 	}

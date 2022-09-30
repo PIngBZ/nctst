@@ -23,10 +23,14 @@ type Client struct {
 	kcp            *nctst.Kcp
 	smux           *smux.Session
 	listener       net.Listener
+	socks5         *socks5.Server
 	duplicater     *nctst.Duplicater
 	tunnels        map[uint]*nctst.OuterTunnel
 	tunnelsLocker  sync.Mutex
 	tunnelsListVer uint32
+
+	die     chan struct{}
+	dieOnce sync.Once
 }
 
 func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType string) *Client {
@@ -67,8 +71,39 @@ func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType st
 		go h.listenAndServeTCP()
 	}
 
-	log.Printf("new client %s %d %d\n", uuid, id, duplicateNum)
+	log.Printf("Client.New %s %d %d %s\n", uuid, id, duplicateNum, tarType)
 	return h
+}
+
+func (h *Client) Close() {
+	var once bool
+	h.dieOnce.Do(func() {
+		close(h.die)
+		once = true
+	})
+
+	if !once {
+		return
+	}
+
+	h.tunnelsLocker.Lock()
+
+	for _, v := range h.tunnels {
+		v.Close()
+	}
+
+	h.duplicater.Close()
+	h.kcp.Close()
+
+	if h.socks5 != nil {
+		h.socks5.Close()
+	}
+
+	h.listener.Close()
+
+	h.tunnelsLocker.Unlock()
+
+	log.Printf("Client.Close %d %s\n", h.ID, h.UUID)
 }
 
 func (h *Client) AddConn(conn *net.TCPConn, tunnelID uint, connID uint) {
@@ -112,7 +147,7 @@ func (h *Client) connectTarget(conn net.Conn) {
 }
 
 func (h *Client) listenAndServeSocks5() {
-	srv := &socks5.Server{
+	h.socks5 = &socks5.Server{
 		Addr:                  config.Listen,
 		Authenticators:        nil,
 		DisableSocks4:         true,
@@ -122,7 +157,7 @@ func (h *Client) listenAndServeSocks5() {
 		HandshakeWriteTimeout: time.Second * 5,
 	}
 
-	srv.Serve(h.listener)
+	h.socks5.Serve(h.listener)
 }
 
 func (t *Client) TransportStream(client io.ReadWriteCloser, remote io.ReadWriteCloser) <-chan error {

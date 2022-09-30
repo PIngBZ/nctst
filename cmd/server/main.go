@@ -18,9 +18,10 @@ var (
 
 	UserMgr = &UserManager{}
 
-	clients            = make(map[string]*Client)
-	clientsLocker      = sync.Mutex{}
-	nextClientID  uint = uint(rand.Intn(89999) + 10000)
+	clients                  = make(map[string]*Client)
+	clientUserNameIndex      = make(map[string]*Client)
+	clientsLocker            = sync.Mutex{}
+	nextClientID        uint = uint(rand.Intn(89999) + 10000)
 )
 
 func init() {
@@ -61,15 +62,25 @@ func main() {
 func onNewConnection(conn *net.TCPConn) {
 	conn.SetDeadline(time.Now().Add(time.Second * 5))
 
+	if k, err := nctst.ReadUInt(conn); err != nil {
+		nctst.DelayClose(conn)
+		log.Printf("onNewConnection ReadKey err: %+v\n", err)
+		return
+	} else if k != nctst.NEW_CONNECTION_KEY {
+		nctst.DelayClose(conn)
+		log.Printf("onNewConnection error key %d\n", k)
+		return
+	}
+
 	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
-		conn.Close()
+		nctst.DelayClose(conn)
 		log.Printf("onNewConnection ReadHeader err: %+v\n", err)
 		return
 	}
 
 	if !nctst.IsCommand(buf) {
-		conn.Close()
+		nctst.DelayClose(conn)
 		buf.Release()
 		log.Println("onNewConnection not command")
 		return
@@ -79,7 +90,7 @@ func onNewConnection(conn *net.TCPConn) {
 	buf.Release()
 	if err != nil {
 		log.Printf("onNewConnection ReadCommand err: %+v\n", err)
-		conn.Close()
+		nctst.DelayClose(conn)
 		return
 	}
 	if command.Type == nctst.Cmd_idle {
@@ -91,16 +102,17 @@ func onNewConnection(conn *net.TCPConn) {
 	} else if command.Type == nctst.Cmd_handshake {
 		doHandshake(conn, command)
 	} else {
-		conn.Close()
+		nctst.DelayClose(conn)
 		log.Printf("onNewConnection cmd type err: %d\n", command.Type)
 	}
 }
 
 func doLogin(conn *net.TCPConn, command *nctst.Command) {
+	defer conn.Close()
+
 	cmd := command.Item.(*nctst.CommandLogin)
 
 	if cmd.Key != config.Key {
-		conn.Close()
 		log.Println("login error key: " + cmd.Key)
 		return
 	}
@@ -111,32 +123,33 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 	}
 
 	clientsLocker.Lock()
-	client, ok := clients[cmd.ClientUUID]
-	if ok {
+
+	if _, ok := clients[cmd.ClientUUID]; ok {
 		clientsLocker.Unlock()
-		conn.Close()
 		log.Println("login uuid exist: " + cmd.ClientUUID)
 		return
 	}
 
-	client = NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
+	if client, ok := clientUserNameIndex[cmd.UserName]; ok {
+		client.Close()
+		delete(clients, client.UUID)
+		delete(clientUserNameIndex, cmd.UserName)
+	}
+
+	client := NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
 	nextClientID++
 	clients[cmd.ClientUUID] = client
+	clientUserNameIndex[cmd.UserName] = client
+
 	clientsLocker.Unlock()
 
 	sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, nctst.LoginReply_success)
-	conn.Close()
+
 	log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
 }
 
 func doHandshake(conn *net.TCPConn, command *nctst.Command) {
 	cmd := command.Item.(*nctst.CommandHandshake)
-
-	if cmd.Key != config.Key {
-		log.Println("handshake error key: " + cmd.Key)
-		conn.Close()
-		return
-	}
 
 	clientsLocker.Lock()
 	client, ok := clients[cmd.ClientUUID]
