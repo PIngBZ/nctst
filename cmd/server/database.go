@@ -23,6 +23,10 @@ func init() {
 			username VARCHAR(64),
 			password VARCHAR(64),
 			name VARCHAR(64),
+			lastip VARCHAR(64),
+			lasttime TIMESTAMP DEFAULT 0,
+			createtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			status INTEGER DEFAULT 0,
 		); 
 	`
 	db.Exec(cmd)

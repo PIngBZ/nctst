@@ -1,6 +1,6 @@
 {
-    "username": "",
-    "password": "",
+    "username": "test",
+    "password": "test",
     "listen": ":6101",
     "serverIP": "127.0.0.1",
     "serverPort": "8000",

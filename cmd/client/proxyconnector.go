@@ -90,6 +90,10 @@ func (h *ProxyConnector) connect() bool {
 }
 
 func (h *ProxyConnector) sendHandshake(conn io.Writer) error {
+	if err := nctst.WriteUInt(conn, nctst.NEW_CONNECTION_KEY); err != nil {
+		return err
+	}
+
 	cmd := &nctst.CommandHandshake{}
 	cmd.ClientUUID = UUID
 	cmd.ClientID = ClientID

@@ -23,6 +23,10 @@ var (
 	DelayCloseNum uint32 = 0
 )
 
+type ContextKey struct {
+	Key string
+}
+
 func CheckError(err error) {
 	if err != nil {
 		log.Printf("%+v\n", err)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"sync"
+	"time"
 
 	"github.com/PIngBZ/nctst"
 	"github.com/go-chi/chi/middleware"
@@ -11,7 +13,9 @@ import (
 	"github.com/go-chi/render"
 )
 
-var ()
+var (
+	UserMgr = &UserManager{}
+)
 
 func init() {
 	go UserMgr.daemon()
@@ -25,6 +29,7 @@ type UserInfo struct {
 }
 
 type UserManager struct {
+	authCodes sync.Map
 }
 
 func (h *UserManager) CheckUserPassword(username, hash string) bool {
@@ -37,28 +42,61 @@ func (h *UserManager) CheckUserPassword(username, hash string) bool {
 	return count != 0
 }
 
+func (h *UserManager) CheckAuthCode(username string, code int) bool {
+	if c, ok := h.authCodes.Load(username); ok {
+		return c.(int) == code
+	}
+	return false
+}
+
 func (h *UserManager) daemon() {
 	r := chi.NewRouter()
 
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.RequestID)
+	r.Use(middleware.RealIP)
+	r.Use(middleware.Throttle(30))
+	r.Use(middleware.Logger)
+	r.Use(middleware.Timeout(10 * time.Second))
+	r.Use(h.BasicAuth)
 	r.Use(render.SetContentType(render.ContentTypeJSON))
-	r.Use(middleware.BasicAuth("Need Login", map[string]string{
-		"nct": "mutopia",
-	}))
 
 	r.Route("/users", func(r chi.Router) {
 		r.Get("/", h.ListUsers)
 
-		r.Route("/{articleID}", func(r chi.Router) {
+		r.Route("/{username}", func(r chi.Router) {
 			r.Use(h.UserCtx)
 			r.Get("/", h.GetUser)
 			r.Put("/", h.UpdateUser)
 			r.Delete("/", h.DeleteUser)
+			r.Get("/authcode", h.GenerateAuthCode)
 		})
 	})
 
 	http.ListenAndServe(config.AdminListen, r)
 }
+
+func (h *UserManager) BasicAuth(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, pass, ok := r.BasicAuth()
+		if !ok {
+			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		if !h.CheckUserPassword(user, pass) {
+			time.Sleep(time.Second * 5)
+			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+var UserContextKey = &nctst.ContextKey{Key: "user"}
 
 func (h *UserManager) UserCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,7 +112,7 @@ func (h *UserManager) UserCtx(next http.Handler) http.Handler {
 			render.Render(w, r, nctst.ErrNotFound)
 			return
 		}
-		ctx := context.WithValue(r.Context(), "user", user)
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -105,4 +143,8 @@ func (h *UserManager) UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserManager) DeleteUser(w http.ResponseWriter, r *http.Request) {
 
+}
+
+func (h *UserManager) GenerateAuthCode(w http.ResponseWriter, r *http.Request) {
+	//n := 1000 + rand.Intn(8999)
 }

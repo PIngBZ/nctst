@@ -16,8 +16,6 @@ var (
 	configFile string
 	config     *Config
 
-	UserMgr = &UserManager{}
-
 	clients                  = make(map[string]*Client)
 	clientUserNameIndex      = make(map[string]*Client)
 	clientsLocker            = sync.Mutex{}
