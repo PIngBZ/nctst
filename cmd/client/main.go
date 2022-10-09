@@ -16,6 +16,7 @@ var (
 	UUID     = uuid.NewString()
 	ClientID uint
 
+	authCode   int
 	configFile string
 	config     *Config
 
@@ -30,11 +31,20 @@ var (
 func init() {
 	nctst.OpenLog()
 
+	flag.IntVar(&authCode, "d", 0, "auth code")
 	flag.StringVar(&configFile, "c", "", "configure file")
 	flag.Parse()
 
+	if authCode == 0 {
+		log.Println("Attention, no auth code. Only test environment can work.")
+	}
+
 	if configFile == "" {
-		nctst.CheckError(errors.New("no config file"))
+		if exist, _ := nctst.PathExists("config.json"); !exist {
+			nctst.CheckError(errors.New("no config file"))
+		} else {
+			configFile = "config.json"
+		}
 	}
 
 	var err error

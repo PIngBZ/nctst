@@ -10,6 +10,7 @@ type Config struct {
 	AdminListen string `json:"adminlisten"`
 	Target      string `json:"target"`
 	Key         string `json:"key"`
+	Test        bool   `json:"test"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

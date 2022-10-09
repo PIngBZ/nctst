@@ -10,18 +10,27 @@ import (
 	"github.com/PIngBZ/socks5"
 )
 
+var (
+	ERR_LOGIN_AUTHORITY = errors.New("login error username or password")
+	ERR_LOGIN_AUTHCODE  = errors.New("login error auth code")
+)
+
 func WaittingLogin() {
 	log.Println("login ...")
 	for {
 		for _, serverIP := range config.Proxies {
-			if err := tryLogin(serverIP); err != nil {
-				log.Printf("try login failed %s %+v\n", serverIP, err)
-			} else {
+			if err := tryLogin(serverIP); err == nil {
 				log.Printf("login success %d\n", ClientID)
 				return
+			} else if err == ERR_LOGIN_AUTHCODE || err == ERR_LOGIN_AUTHORITY {
+				log.Printf("try login failed %s\n", serverIP)
+				nctst.CheckError(err)
+				return
+			} else {
+				log.Printf("try login failed %s %+v\n", serverIP, err)
 			}
 		}
-		log.Println("login failed, wait 5s to retry ...")
+		log.Println("wait 5s to retry ...")
 		time.Sleep(time.Second * 5)
 	}
 }
@@ -60,6 +69,7 @@ func sendLoginCommand(conn *net.TCPConn) error {
 	}
 
 	cmd := &nctst.CommandLogin{}
+	cmd.AuthCode = authCode
 	cmd.UserName = config.UserName
 	cmd.PassWord = nctst.HashPassword(config.UserName, config.PassWord)
 	cmd.ClientUUID = UUID
@@ -87,6 +97,12 @@ func receiveLoginReply(conn *net.TCPConn) error {
 		return err
 	}
 	cmd := command.Item.(*nctst.CommandLoginReply)
+
+	if cmd.Code == nctst.LoginReply_errAuthCode {
+		return ERR_LOGIN_AUTHCODE
+	} else if cmd.Code == nctst.LoginReply_errAuthority {
+		return ERR_LOGIN_AUTHORITY
+	}
 
 	ClientID = cmd.ClientID
 	connKey = cmd.ConnectKey

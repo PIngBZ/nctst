@@ -181,6 +181,7 @@ type CommandTestPing struct {
 }
 
 type CommandLogin struct {
+	AuthCode   int
 	ClientUUID string
 	UserName   string
 	PassWord   string
@@ -194,6 +195,7 @@ type LoginReply_Code uint32
 
 const (
 	LoginReply_success LoginReply_Code = iota
+	LoginReply_errAuthCode
 	LoginReply_errAuthority
 )
 

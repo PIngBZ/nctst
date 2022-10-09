@@ -115,6 +115,11 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 		return
 	}
 
+	if !UserMgr.CheckAuthCode(cmd.UserName, cmd.AuthCode) {
+		sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthCode)
+		return
+	}
+
 	if !UserMgr.CheckUserPassword(cmd.UserName, cmd.PassWord) {
 		sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthority)
 		return
