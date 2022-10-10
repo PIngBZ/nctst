@@ -40,6 +40,8 @@ func init() {
 }
 
 func main() {
+	createAminUser()
+
 	tcpAddr, err := net.ResolveTCPAddr("tcp", config.Listen)
 	nctst.CheckError(err)
 

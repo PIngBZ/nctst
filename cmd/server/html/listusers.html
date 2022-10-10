@@ -1,0 +1,66 @@
+<html>
+
+<head>
+    <style>
+        ul{margin:0;padding:0;list-style:none;}  
+        .table{display:table;border-collapse:collapse;border:1px solid #ccc;}  
+        .table-caption{display:table-caption;margin:0;padding:0;font-size:16px;}  
+        .table-column-group{display:table-column-group;}  
+        .table-column{display:table-column;width:160px;}  
+        .table-row-group{display:table-row-group;}  
+        .table-row{display:table-row;}  
+        .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
+        .table-cell{display:table-cell;padding:5px;border:1px solid #ccc;}  
+        .table-header-group{display:table-header-group;background:#eee;font-weight:bold;}  
+    </style>
+</head>
+
+<body>
+    {{.InitCode}}
+    {{.InitCodeTime}}
+    <div class="table">
+        <div class="table-column-group">
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+        </div>
+        <div class="table-header-group">
+            <ul class="table-row">
+                <li class="table-cell">ID</li>
+                <li class="table-cell">USER</li>
+                <li class="table-cell">NAME</li>
+                <li class="table-cell">LASTUSE</li>
+                <li class="table-cell">CREATE</li>
+                <li class="table-cell">ADMIN</li>
+                <li class="table-cell">DELETE</li>
+            </ul>
+        </div>
+        <div class="table-row-group">
+            {{range .List}}
+            <ul class="table-row">
+                <li class="table-cell">{{.ID}}</li>
+                <li class="table-cell">{{.UserName}}</li>
+                <li class="table-cell">{{.RealName}}</li>
+                <li class="table-cell">{{.LastTime}}</li>
+                <li class="table-cell">{{.CreateTime}}</li>
+                <li class="table-cell">{{.Admin}} 
+                    {{if ne .UserName "admin"}}
+                    <a href="/users/{{.UserName}}/admin">Change</a></li>
+                	{{end}}
+                <li class="table-cell">
+                    {{if ne .UserName "admin"}}
+                    <a href="/users/{{.UserName}}/del">Del</a>
+                	{{end}}
+                </li>
+            </ul>
+            {{end}}
+        </div>
+    </div>
+    <a href="/users/add">Add User</a>
+</body>
+
+</html>

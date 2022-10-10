@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	ERR_LOGIN_AUTHORITY = errors.New("login error username or password")
-	ERR_LOGIN_AUTHCODE  = errors.New("login error auth code")
+	ErrLoginAuthority = errors.New("error username or password")
+	ErrLoginAuthCode  = errors.New("error auth code")
 )
 
 func WaittingLogin() {
@@ -22,7 +22,7 @@ func WaittingLogin() {
 			if err := tryLogin(serverIP); err == nil {
 				log.Printf("login success %d\n", ClientID)
 				return
-			} else if err == ERR_LOGIN_AUTHCODE || err == ERR_LOGIN_AUTHORITY {
+			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
 				log.Printf("try login failed %s\n", serverIP)
 				nctst.CheckError(err)
 				return
@@ -99,9 +99,9 @@ func receiveLoginReply(conn *net.TCPConn) error {
 	cmd := command.Item.(*nctst.CommandLoginReply)
 
 	if cmd.Code == nctst.LoginReply_errAuthCode {
-		return ERR_LOGIN_AUTHCODE
+		return ErrLoginAuthCode
 	} else if cmd.Code == nctst.LoginReply_errAuthority {
-		return ERR_LOGIN_AUTHORITY
+		return ErrLoginAuthCode
 	}
 
 	ClientID = cmd.ClientID

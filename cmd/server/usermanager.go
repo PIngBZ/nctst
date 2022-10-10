@@ -2,37 +2,68 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"math/rand"
 	"net/http"
+	"strconv"
 	"sync"
+	"sync/atomic"
+	"text/template"
 	"time"
 
 	"github.com/PIngBZ/nctst"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
+	"github.com/google/uuid"
 )
 
 var (
 	UserMgr = &UserManager{}
+
+	LoginUserContextKey  = &nctst.ContextKey{Key: "login_user_context_key"}
+	TargetUserContextKey = &nctst.ContextKey{Key: "user_context_key"}
 )
 
 func init() {
 	go UserMgr.daemon()
 }
 
+type UserStatus int
+
+const (
+	UserStatus_Active UserStatus = iota
+	UserStatus_Blocked
+)
+
 type UserInfo struct {
-	ID       string
-	Name     string
-	Password string
-	Hash     string
+	ID         string
+	UserName   string
+	RealName   string
+	Hash       string
+	Admin      bool
+	Session    string
+	LastTime   time.Time
+	CreateTime time.Time
+	Status     UserStatus
+}
+
+type CodeInfo struct {
+	Code int
+	Time time.Time
 }
 
 type UserManager struct {
-	authCodes sync.Map
+	authCodes    sync.Map
+	initCode     atomic.Uint32
+	initCodeTime atomic.Value
 }
 
 func (h *UserManager) CheckUserPassword(username, hash string) bool {
+	if username == "admin" && hash == config.AdminPassword {
+		return true
+	}
 	var count int
 	err := DB.QueryRow("select count(*) from userinfo where username=? and password=?", username, hash).Scan(&count)
 	if err != nil {
@@ -48,7 +79,12 @@ func (h *UserManager) CheckAuthCode(username string, code int) bool {
 	}
 
 	if c, ok := h.authCodes.Load(username); ok {
-		return c.(int) == code
+		info := c.(*CodeInfo)
+		if time.Now().Before(info.Time.Add(time.Second * 65)) {
+			h.authCodes.Delete(username)
+			return false
+		}
+		return info.Code == code
 	}
 	return false
 }
@@ -56,43 +92,76 @@ func (h *UserManager) CheckAuthCode(username string, code int) bool {
 func (h *UserManager) daemon() {
 	r := chi.NewRouter()
 
+	r.Use(middleware.Throttle(30))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Throttle(30))
 	r.Use(middleware.Logger)
 	r.Use(middleware.Timeout(10 * time.Second))
-	r.Use(h.BasicAuth)
-	r.Use(render.SetContentType(render.ContentTypeJSON))
+	r.Use(h.basicAuth)
+
+	r.Get("/initdev", h.initAuthDevice)
+	r.Get("/authcode", h.generateAuthCode)
 
 	r.Route("/users", func(r chi.Router) {
-		r.Get("/", h.ListUsers)
+		r.Use(h.checkAdmin)
+		r.Get("/", h.listUsers)
+		r.Get("/add", h.addUser)
+		r.Post("/commit", h.commitUser)
 
 		r.Route("/{username}", func(r chi.Router) {
-			r.Use(h.UserCtx)
-			r.Get("/", h.GetUser)
-			r.Put("/", h.UpdateUser)
-			r.Delete("/", h.DeleteUser)
-			r.Get("/authcode", h.GenerateAuthCode)
+			r.Use(h.userCtx)
+			r.Get("/del", h.deleteUser)
+			r.Get("/admin", h.changeAdmin)
 		})
 	})
 
 	http.ListenAndServe(config.AdminListen, r)
 }
 
-func (h *UserManager) BasicAuth(next http.Handler) http.Handler {
+func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, pass, ok := r.BasicAuth()
+		name, pass, ok := r.BasicAuth()
 		if !ok {
 			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
-		if !h.CheckUserPassword(user, pass) {
+		user, err := h.dbGetUser(name)
+		if err != nil {
+			log.Printf("basicAuth dbGetUser error %+v\n", err)
+			time.Sleep(time.Second * 2)
+			render.Render(w, r, ErrForbidden)
+			return
+		}
+
+		if nctst.HashPassword(name, pass) != user.Hash {
 			time.Sleep(time.Second * 5)
 			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
 			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+
+		DB.Exec("update userinfo set lasttime=now() where id=?", user.ID)
+
+		ctx := context.WithValue(r.Context(), LoginUserContextKey, user)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *UserManager) checkAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name, _, _ := r.BasicAuth()
+
+		if name == "admin" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		user, err := h.dbGetUser(name)
+		if err != nil || !user.Admin {
+			render.Render(w, r, ErrForbidden)
 			return
 		}
 
@@ -100,55 +169,250 @@ func (h *UserManager) BasicAuth(next http.Handler) http.Handler {
 	})
 }
 
-var UserContextKey = &nctst.ContextKey{Key: "user"}
-
-func (h *UserManager) UserCtx(next http.Handler) http.Handler {
+func (h *UserManager) userCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var user *UserInfo
 		var err error
 		if username := chi.URLParam(r, "username"); username != "" {
 			user, err = h.dbGetUser(username)
 		} else {
-			render.Render(w, r, nctst.ErrNotFound)
+			render.Render(w, r, ErrNotFound)
 			return
 		}
 		if err != nil {
-			render.Render(w, r, nctst.ErrNotFound)
+			render.Render(w, r, ErrNotFound)
 			return
 		}
-		ctx := context.WithValue(r.Context(), UserContextKey, user)
+		ctx := context.WithValue(r.Context(), TargetUserContextKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
 func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
-	var id, name, pwd string
-	if err := DB.QueryRow("select id, password from userinfo where username=?", username).Scan(&id, &name, &pwd); err != nil {
+	var id, realName, hash, session string
+	var admin, status int
+	var lastTime, createTime time.Time
+	cmd := "select id,realname,password,admin,session,lasttime,createtime,status from userinfo where username=?"
+	if err := DB.QueryRow(cmd, username).Scan(&id, &realName, &hash, &admin, &session, &lastTime, &createTime, &status); err != nil {
 		return nil, err
 	}
 	user := &UserInfo{}
 	user.ID = id
-	user.Name = username
-	user.Hash = pwd
+	user.UserName = username
+	user.RealName = realName
+	user.Hash = hash
+	user.Admin = admin == 1
+	user.Session = session
+	user.LastTime = lastTime
+	user.CreateTime = createTime
+	user.Status = UserStatus(status)
 	return user, nil
 }
 
-func (h *UserManager) ListUsers(w http.ResponseWriter, r *http.Request) {
-
+type ListUserRenderData struct {
+	List         []*UserInfo
+	InitCode     int32
+	InitCodeTime int
 }
 
-func (h *UserManager) GetUser(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
+	var id, userName, realName, hash string
+	var admin, status int
+	var lastTime, createTime time.Time
+	cmd := "select id,username,realname,password,admin,lasttime,createtime,status from userinfo order by id"
+	rows, err := DB.Query(cmd)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+	defer rows.Close()
 
+	users := make([]*UserInfo, 0)
+	for rows.Next() {
+		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status); err != nil {
+			render.Render(w, r, ErrInternal(err))
+			return
+		}
+		user := &UserInfo{}
+		user.ID = id
+		user.UserName = userName
+		user.RealName = realName
+		user.Hash = hash
+		user.Admin = admin == 1
+		user.LastTime = lastTime
+		user.CreateTime = createTime
+		user.Status = UserStatus(status)
+		users = append(users, user)
+	}
+
+	t, err := template.ParseFiles("html/listusers.html")
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	initCodeValid := false
+	if ta := h.initCodeTime.Load(); ta != nil {
+		t := ta.(time.Time)
+		initCodeValid = t.Add(time.Minute * 5).After(time.Now())
+	}
+	if !initCodeValid {
+		h.initCode.Store(uint32(1000 + rand.Intn(9000)))
+		h.initCodeTime.Store(time.Now())
+	}
+
+	sec := time.Until(h.initCodeTime.Load().(time.Time).Add(time.Minute*5)) / time.Second
+	data := ListUserRenderData{List: users, InitCode: int32(h.initCode.Load()), InitCodeTime: int(sec)}
+
+	err = t.Execute(w, data)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
 }
 
-func (h *UserManager) UpdateUser(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) addUser(w http.ResponseWriter, r *http.Request) {
+	t, err := template.ParseFiles("html/edituser.html")
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
 
+	user := &UserInfo{}
+	err = t.Execute(w, []*UserInfo{user})
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
 }
 
-func (h *UserManager) DeleteUser(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
 
+	userName := r.Form.Get("username")
+	hash := r.Form.Get("password")
+	hashH := r.Form.Get("passwordH")
+	realName := r.Form.Get("realname")
+	if hash == "" {
+		hash = hashH
+	} else {
+		hash = nctst.HashPassword(userName, hash)
+	}
+	if userName == "" || hash == "" || realName == "" {
+		render.Render(w, r, ErrInvalidRequest(errors.New("params error")))
+		return
+	}
+
+	adminS := r.Form.Get("admin")
+	admin := 0
+	if adminS == "1" {
+		admin = 1
+	}
+
+	cmd := "insert into userinfo(username,realname,password,admin) values(?,?,?,?)"
+	_, err := DB.Exec(cmd, userName, realName, hash, admin)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
 }
 
-func (h *UserManager) GenerateAuthCode(w http.ResponseWriter, r *http.Request) {
-	//n := 1000 + rand.Intn(8999)
+func (h *UserManager) deleteUser(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+	_, err := DB.Exec("delete from userinfo where id=?", user.ID)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
+}
+
+func (h *UserManager) changeAdmin(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+
+	if user.UserName == "admin" {
+		render.Render(w, r, ErrForbidden)
+		return
+	}
+
+	toAdmin := 1
+	if user.Admin {
+		toAdmin = 0
+	}
+	_, err := DB.Exec("update userinfo set admin=? where id=?", toAdmin, user.ID)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
+}
+
+func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	r.ParseForm()
+
+	session := r.Form.Get("session")
+	if session != user.Session {
+		render.Render(w, r, ErrForbidden)
+		return
+	}
+
+	newCode := &CodeInfo{Code: 1000 + rand.Intn(9000), Time: time.Now()}
+	if c, loaded := h.authCodes.LoadOrStore(user.UserName, newCode); loaded {
+		info := c.(*CodeInfo)
+		if info.Time.Add(time.Second * 50).Before(time.Now()) {
+			h.authCodes.Store(user.UserName, newCode)
+			info = newCode
+		}
+
+		seconds := int(time.Until(info.Time.Add(time.Second*60)) / time.Second)
+		WriteResponse(w, &CodeResponse{AuthCode: info.Code, Seconds: seconds})
+	} else {
+		WriteResponse(w, &CodeResponse{AuthCode: newCode.Code, Seconds: 60})
+	}
+}
+
+func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+	r.ParseForm()
+
+	initCodeS := r.Form.Get("code")
+	if initCodeS == "" {
+		render.Render(w, r, ErrInvalidRequest(errors.New("error params")))
+		return
+	}
+	initCode, err := strconv.Atoi(initCodeS)
+	if err != nil {
+		render.Render(w, r, ErrInvalidRequest(err))
+		return
+	}
+
+	if ta := h.initCodeTime.Load(); ta == nil {
+		render.Render(w, r, ErrForbidden)
+		return
+	} else {
+		t := ta.(time.Time)
+		if !t.Add(time.Minute * 5).After(time.Now()) {
+			render.Render(w, r, ErrForbidden)
+			return
+		}
+
+		if initCode != int(h.initCode.Load()) {
+			render.Render(w, r, ErrForbidden)
+			return
+		}
+
+		session := uuid.NewString()
+		if _, err := DB.Exec("update userinfo set session=? where id=?", session, user.ID); err != nil {
+			render.Render(w, r, ErrInternal(err))
+			return
+		}
+
+		WriteResponse(w, &InitResponse{Session: session})
+	}
 }
