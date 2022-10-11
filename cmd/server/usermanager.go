@@ -47,11 +47,13 @@ type UserInfo struct {
 	LastTime   time.Time
 	CreateTime time.Time
 	Status     UserStatus
+	CodeInfo   *CodeInfo
 }
 
 type CodeInfo struct {
-	Code int
-	Time time.Time
+	Code    int
+	Time    time.Time
+	Seconds int
 }
 
 type UserManager struct {
@@ -80,7 +82,7 @@ func (h *UserManager) CheckAuthCode(username string, code int) bool {
 
 	if c, ok := h.authCodes.Load(username); ok {
 		info := c.(*CodeInfo)
-		if time.Now().Before(info.Time.Add(time.Second * 65)) {
+		if time.Now().After(info.Time.Add(time.Second * 65)) {
 			h.authCodes.Delete(username)
 			return false
 		}
@@ -206,6 +208,12 @@ func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
 	user.LastTime = lastTime
 	user.CreateTime = createTime
 	user.Status = UserStatus(status)
+
+	if c, loaded := h.authCodes.Load(username); loaded {
+		user.CodeInfo = c.(*CodeInfo)
+		user.CodeInfo.Seconds = int(time.Until(user.CodeInfo.Time.Add(time.Second*60)) / time.Second)
+	}
+
 	return user, nil
 }
 
@@ -242,6 +250,12 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 		user.LastTime = lastTime
 		user.CreateTime = createTime
 		user.Status = UserStatus(status)
+
+		if c, loaded := h.authCodes.Load(userName); loaded {
+			user.CodeInfo = c.(*CodeInfo)
+			user.CodeInfo.Seconds = int(time.Until(user.CodeInfo.Time.Add(time.Second*60)) / time.Second)
+		}
+
 		users = append(users, user)
 	}
 

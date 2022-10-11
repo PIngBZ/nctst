@@ -1,33 +1,22 @@
-package trojan
+package proxyclient
 
 import (
 	"bytes"
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/binary"
-	"errors"
 	"fmt"
-	"net"
-	"time"
 
 	"github.com/PIngBZ/nctst"
 )
 
 type TrojanClient struct {
-	ServerName string
-	ServerIP   string
-	ServerPort int
-
-	TargetHost string
-	TargetPort int
-
-	Conn     net.Conn
-	TestPing uint
+	proxyClient
 
 	headerWritten bool
 }
 
-func NewTrojanClient(serverName string, serverIP string, serverPort int, targetHost string, targetPort int) *TrojanClient {
+func NewTrojanClient(serverName string, serverIP string, serverPort int, targetHost string, targetPort int) ProxyClient {
 	h := &TrojanClient{}
 	h.ServerName = serverName
 	h.ServerIP = serverIP
@@ -38,9 +27,8 @@ func NewTrojanClient(serverName string, serverIP string, serverPort int, targetH
 }
 
 func (h *TrojanClient) Connect() error {
-	if h.Conn != nil {
-		return errors.New("already connect")
-	}
+	h.Close()
+
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
 		ServerName:         h.ServerName,
@@ -121,51 +109,4 @@ func (h *TrojanClient) writeMetadata(buf *bytes.Buffer) {
 	port := [2]byte{}
 	binary.BigEndian.PutUint16(port[:], uint16(h.TargetPort))
 	buf.Write(port[:])
-}
-
-func (h *TrojanClient) Ping(finished func(*TrojanClient, uint, error)) {
-	defer h.Close()
-
-	if err := h.Connect(); err != nil {
-		finished(h, 0, err)
-		return
-	}
-
-	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_idle, Item: &nctst.CommandIdle{}}); err != nil {
-		finished(h, 0, err)
-		return
-	}
-
-	time.Sleep(time.Millisecond * 500)
-
-	cmd := &nctst.CommandTestPing{}
-	cmd.SendTime = time.Now().UnixNano() / 1e6
-	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
-		finished(h, 0, err)
-		return
-	}
-
-	buf, err := nctst.ReadLBuf(h)
-	if err != nil {
-		finished(h, 0, err)
-		return
-	}
-
-	command, err := nctst.ReadCommand(buf)
-	if err != nil {
-		finished(h, 0, err)
-		return
-	}
-
-	if command.Type != nctst.Cmd_testping {
-		finished(h, 0, errors.New("testping ret type error"))
-		return
-	}
-
-	ret := command.Item.(*nctst.CommandTestPing)
-
-	ping := uint(time.Now().UnixNano()/1e6 - ret.SendTime)
-
-	h.TestPing = ping
-	finished(h, ping, nil)
 }

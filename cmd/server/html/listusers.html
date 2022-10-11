@@ -6,7 +6,7 @@
         .table{display:table;border-collapse:collapse;border:1px solid #ccc;}  
         .table-caption{display:table-caption;margin:0;padding:0;font-size:16px;}  
         .table-column-group{display:table-column-group;}  
-        .table-column{display:table-column;width:160px;}  
+        .table-column{display:table-column;width:130px;}  
         .table-row-group{display:table-row-group;}  
         .table-row{display:table-row;}  
         .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
@@ -27,6 +27,8 @@
             <div class="table-column"></div>
             <div class="table-column"></div>
             <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
         </div>
         <div class="table-header-group">
             <ul class="table-row">
@@ -37,6 +39,8 @@
                 <li class="table-cell">CREATE</li>
                 <li class="table-cell">ADMIN</li>
                 <li class="table-cell">DELETE</li>
+                <li class="table-cell">CODE</li>
+                <li class="table-cell">SECONDS</li>
             </ul>
         </div>
         <div class="table-row-group">
@@ -56,7 +60,17 @@
                     <a href="/users/{{.UserName}}/del">Del</a>
                 	{{end}}
                 </li>
-            </ul>
+                <li class="table-cell">
+                {{if .CodeInfo}}
+                    {{.CodeInfo.Code}}
+                {{end}}
+                </li>
+                <li class="table-cell">
+                    {{if .CodeInfo}}
+                        {{.CodeInfo.Seconds}}
+                    {{end}}
+                    </li>
+                </ul>
             {{end}}
         </div>
     </div>

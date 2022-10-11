@@ -4,15 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type Config struct {
-	UserName     string   `json:"username"`
-	PassWord     string   `json:"password"`
-	Listen       string   `json:"listen"`
-	ServerIP     string   `json:"serverIP"`
-	ServerPort   string   `json:"serverPort"`
+	UserName     string `json:"username"`
+	PassWord     string `json:"password"`
+	Listen       string `json:"listen"`
+	ServerIP     string `json:"serverIP"`
+	ServerPort   string `json:"serverPort"`
+	ServerPortI  int
 	Proxies      []string `json:"proxies"`
+	ProxyFile    string   `json:"proxyfile"`
 	Connperproxy int      `json:"connperproxy"`
 	Compress     bool     `json:"compress"`
 	TarType      string   `json:"tartype"`
@@ -32,6 +35,8 @@ func parseConfig(configFile string) (*Config, error) {
 	if err := json.NewDecoder(file).Decode(cfg); err != nil {
 		return nil, err
 	}
+
+	cfg.ServerPortI, _ = strconv.Atoi(cfg.ServerPort)
 
 	if cfg.Connperproxy == 0 {
 		cfg.Connperproxy = 1

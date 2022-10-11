@@ -1,9 +1,9 @@
 package nctst
 
 import (
+	"io"
 	"log"
 	"math/rand"
-	"net"
 	"sync"
 	"time"
 )
@@ -77,7 +77,7 @@ func (h *OuterTunnel) Close() {
 	log.Printf("OuterTunnel.Close %d %d\n", h.ClientID, h.ID)
 }
 
-func (h *OuterTunnel) AddConn(conn *net.TCPConn, id uint) (outerConn *OuterConnection) {
+func (h *OuterTunnel) AddConn(conn io.ReadWriteCloser, id uint) (outerConn *OuterConnection) {
 	h.RemoveConn(id)
 
 	h.connectionsLocker.Lock()

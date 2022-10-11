@@ -23,6 +23,7 @@ var (
 )
 
 func init() {
+	rand.Seed(time.Now().Unix())
 	nctst.OpenLog()
 
 	flag.StringVar(&configFile, "c", "", "configure file")

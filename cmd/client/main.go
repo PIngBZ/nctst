@@ -4,10 +4,12 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"math/rand"
 	"net"
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/nctst/cmd/client/proxyclient"
 	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
@@ -29,6 +31,7 @@ var (
 )
 
 func init() {
+	rand.Seed(time.Now().Unix())
 	nctst.OpenLog()
 
 	flag.IntVar(&authCode, "d", 0, "auth code")
@@ -101,11 +104,15 @@ func main() {
 }
 
 func startUpstreamProxies() {
-	proxies = make([]*Proxy, len(config.Proxies))
+	if len(config.Proxies) == 0 {
 
-	for i, serverIP := range config.Proxies {
-		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
-		proxies[i] = NewProxy(uint(i), serverIP, tunnel)
-		tunnels = append(tunnels, tunnel)
+	} else {
+		proxies = make([]*Proxy, len(config.Proxies))
+
+		for i, serverIP := range config.Proxies {
+			tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
+			proxies[i] = NewProxy(uint(i), proxyclient.NewProxyClient(serverIP, config.ServerIP, config.ServerPortI), tunnel)
+			tunnels = append(tunnels, tunnel)
+		}
 	}
 }

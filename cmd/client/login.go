@@ -2,12 +2,12 @@ package main
 
 import (
 	"errors"
+	"io"
 	"log"
-	"net"
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/socks5"
+	"github.com/PIngBZ/nctst/cmd/client/proxyclient"
 )
 
 var (
@@ -19,7 +19,8 @@ func WaittingLogin() {
 	log.Println("login ...")
 	for {
 		for _, serverIP := range config.Proxies {
-			if err := tryLogin(serverIP); err == nil {
+			client := proxyclient.NewProxyClient(serverIP, config.ServerIP, config.ServerPortI)
+			if err := tryLogin(client); err == nil {
 				log.Printf("login success %d\n", ClientID)
 				return
 			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
@@ -35,35 +36,28 @@ func WaittingLogin() {
 	}
 }
 
-func tryLogin(addr string) error {
-	client := socks5.Client{
-		ProxyAddr: addr,
-		Auth: map[socks5.METHOD]socks5.Authenticator{
-			socks5.NO_AUTHENTICATION_REQUIRED: &socks5.NoAuth{},
-		},
-	}
-
-	conn, err := client.Connect(socks5.Version5, config.ServerIP+":"+config.ServerPort)
+func tryLogin(client proxyclient.ProxyClient) error {
+	err := client.Connect()
 	if err != nil {
 		return err
 	}
 
-	defer conn.Close()
+	defer client.Close()
 
-	conn.SetDeadline(time.Now().Add(time.Second * 5))
+	client.SetDeadline(time.Now().Add(time.Second * 5))
 
-	if err = sendLoginCommand(conn); err != nil {
+	if err = sendLoginCommand(client); err != nil {
 		return err
 	}
 
-	if err = receiveLoginReply(conn); err != nil {
+	if err = receiveLoginReply(client); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func sendLoginCommand(conn *net.TCPConn) error {
+func sendLoginCommand(conn io.Writer) error {
 	if err := nctst.WriteUInt(conn, nctst.NEW_CONNECTION_KEY); err != nil {
 		return err
 	}
@@ -80,7 +74,7 @@ func sendLoginCommand(conn *net.TCPConn) error {
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }
 
-func receiveLoginReply(conn *net.TCPConn) error {
+func receiveLoginReply(conn io.Reader) error {
 	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
 		return err

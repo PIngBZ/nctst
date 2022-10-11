@@ -39,6 +39,7 @@ func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType st
 	h.ID = id
 	k := md5.Sum([]byte(uuid))
 	h.ConnKey = hex.EncodeToString(k[:])
+	h.die = make(chan struct{})
 
 	h.kcp = nctst.NewKcp(id)
 	if compress {

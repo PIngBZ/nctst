@@ -4,22 +4,21 @@ import (
 	"log"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/nctst/cmd/client/proxyclient"
 )
 
 type Proxy struct {
-	ID   uint
-	Addr string
-
+	ID         uint
 	connectors map[uint]*ProxyConnector
 }
 
-func NewProxy(id uint, addr string, tunnel *nctst.OuterTunnel) *Proxy {
+func NewProxy(id uint, client proxyclient.ProxyClient, tunnel *nctst.OuterTunnel) *Proxy {
 	h := &Proxy{}
 	h.ID = id
 
 	h.connectors = make(map[uint]*ProxyConnector)
 	for i := 0; i < config.Connperproxy; i++ {
-		h.connectors[id] = NewProxyConnector(uint(i), id, addr, tunnel)
+		h.connectors[id] = NewProxyConnector(uint(i), id, client, tunnel)
 	}
 	log.Printf("proxy created %d\n", id)
 	return h

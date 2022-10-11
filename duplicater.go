@@ -22,6 +22,7 @@ type Duplicater struct {
 
 func NewDuplicater(num int, input chan *BufItem, tunnelsListCallback func(uint32) (uint32, []*OuterTunnel)) *Duplicater {
 	h := &Duplicater{}
+	h.die = make(chan struct{})
 
 	h.Output = make(chan *BufItem, 4)
 

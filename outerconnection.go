@@ -1,8 +1,8 @@
 package nctst
 
 import (
+	"io"
 	"log"
-	"net"
 	"sync"
 )
 
@@ -10,10 +10,9 @@ type OuterConnection struct {
 	ID       uint
 	ClientID uint
 	TunnelID uint
-	Addr     string
 	Die      chan struct{}
 
-	conn        *net.TCPConn
+	conn        io.ReadWriteCloser
 	receiveChan chan *BufItem
 	sendChan    chan *BufItem
 	commandChan chan *Command
@@ -21,13 +20,11 @@ type OuterConnection struct {
 	dieOnce sync.Once
 }
 
-func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn *net.TCPConn, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
+func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn io.ReadWriteCloser, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
 	h := &OuterConnection{}
 	h.ID = id
 	h.ClientID = clientID
 	h.TunnelID = tunnelID
-
-	h.Addr = conn.RemoteAddr().String()
 
 	h.conn = conn
 	h.receiveChan = receiveChan
@@ -56,14 +53,14 @@ func (h *OuterConnection) Close() {
 	}
 
 	if h.conn != nil {
-		log.Printf("OuterConnection.Close %s %d %d %d\n", h.conn.RemoteAddr().String(), h.ClientID, h.TunnelID, h.ID)
+		log.Printf("OuterConnection.Close %d %d %d\n", h.ClientID, h.TunnelID, h.ID)
 		h.conn.Close()
 	} else {
 		log.Printf("OuterConnection.Close nil, %d %d %d\n", h.ClientID, h.TunnelID, h.ID)
 	}
 }
 
-func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
+func (h *OuterConnection) receiveLoop(conn io.ReadWriteCloser, once *sync.Once) {
 	defer once.Do(h.Close)
 
 	for {
@@ -93,7 +90,7 @@ func (h *OuterConnection) receiveLoop(conn *net.TCPConn, once *sync.Once) {
 	}
 }
 
-func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
+func (h *OuterConnection) sendLoop(conn io.ReadWriteCloser, once *sync.Once) {
 	defer once.Do(h.Close)
 
 	for {
@@ -103,18 +100,18 @@ func (h *OuterConnection) sendLoop(conn *net.TCPConn, once *sync.Once) {
 		case buf := <-h.sendChan:
 			if err := WriteUInt(conn, uint32(buf.Size())); err != nil {
 				buf.Release()
-				log.Printf("sendLoop WriteUInt error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
+				log.Printf("sendLoop WriteUInt error: %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
 				return
 			}
 			_, err := conn.Write(buf.Data())
 			buf.Release()
 			if err != nil {
-				log.Printf("sendLoop WriteUInt error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
+				log.Printf("sendLoop WriteUInt error: %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
 				return
 			}
 		case command := <-h.commandChan:
 			if err := SendCommand(conn, command); err != nil {
-				log.Printf("sendLoop SendCommand error: %d %d %d %s %+v\n", h.ClientID, h.TunnelID, h.ID, h.Addr, err)
+				log.Printf("sendLoop SendCommand error: %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
 				return
 			}
 		}

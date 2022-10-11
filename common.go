@@ -11,7 +11,9 @@ import (
 	"io"
 	"log"
 	"math/rand"
+	"net"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 
@@ -224,4 +226,18 @@ func PathExists(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func SplitHostPort(addr string) (string, int, error) {
+	host, portS, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", 0, err
+	}
+
+	port, err := strconv.Atoi(portS)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return host, port, nil
 }
