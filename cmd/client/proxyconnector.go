@@ -65,7 +65,7 @@ func (h *ProxyConnector) connect() {
 			return
 		} else if err != nil {
 			h.client.Close()
-			log.Printf("sendHandshake error %+v\n", err)
+			log.Printf("receiveHandshakeReply error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}

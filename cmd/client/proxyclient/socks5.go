@@ -1,6 +1,7 @@
 package proxyclient
 
 import (
+	"io"
 	"strconv"
 	"time"
 
@@ -47,11 +48,19 @@ func (h *Socks5Client) Connect() error {
 }
 
 func (h *Socks5Client) Write(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	n, err := h.Conn.Write(p)
 	return n, err
 }
 
 func (h *Socks5Client) Read(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	n, err := h.Conn.Read(p)
 	return n, err
 }

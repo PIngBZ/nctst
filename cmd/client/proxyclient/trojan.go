@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
+	"io"
 
 	"github.com/PIngBZ/nctst"
 )
@@ -44,6 +45,10 @@ func (h *TrojanClient) Connect() error {
 }
 
 func (h *TrojanClient) Write(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	if !h.headerWritten {
 		n, err := h.writeWithHeader(p)
 		if err != nil {
@@ -57,6 +62,10 @@ func (h *TrojanClient) Write(p []byte) (int, error) {
 }
 
 func (h *TrojanClient) Read(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
 	n, err := h.Conn.Read(p)
 	return n, err
 }

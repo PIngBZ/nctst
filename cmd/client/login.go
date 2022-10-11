@@ -17,18 +17,23 @@ var (
 
 func WaittingLogin() {
 	log.Println("login ...")
+
 	for {
-		for _, serverIP := range config.Proxies {
-			client := proxyclient.NewProxyClient(serverIP, config.ServerIP, config.ServerPortI)
+		for _, proxyIP := range config.Proxies {
+			client := proxyclient.NewProxyClient(proxyIP, config.ServerIP, config.ServerPortI)
+			if client == nil {
+				continue
+			}
+
 			if err := tryLogin(client); err == nil {
 				log.Printf("login success %d\n", ClientID)
 				return
 			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
-				log.Printf("try login failed %s\n", serverIP)
+				log.Printf("try login failed %s\n", proxyIP)
 				nctst.CheckError(err)
 				return
 			} else {
-				log.Printf("try login failed %s %+v\n", serverIP, err)
+				log.Printf("try login failed %s %+v\n", proxyIP, err)
 			}
 		}
 		log.Println("wait 5s to retry ...")

@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/cmd/client/proxyclient"
+	"github.com/PIngBZ/nctst/cmd/client/proxylist"
 	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
@@ -104,15 +104,23 @@ func main() {
 }
 
 func startUpstreamProxies() {
-	if len(config.Proxies) == 0 {
-
-	} else {
-		proxies = make([]*Proxy, len(config.Proxies))
-
-		for i, serverIP := range config.Proxies {
-			tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
-			proxies[i] = NewProxy(uint(i), proxyclient.NewProxyClient(serverIP, config.ServerIP, config.ServerPortI), tunnel)
-			tunnels = append(tunnels, tunnel)
+	var proxyList []string
+	if len(config.Proxies) != 0 {
+		proxyList = config.Proxies
+	} else if len(config.ProxyFile) > 0 {
+		proxyList = proxylist.GetProxyList(config.ProxyFile)
+		if len(proxyList) == 0 {
+			nctst.CheckError(errors.New("can not get proxy server list"))
 		}
+	} else {
+		nctst.CheckError(errors.New("no proxy server"))
+	}
+
+	proxies = make([]*Proxy, len(proxyList))
+
+	for i, proxyIP := range config.Proxies {
+		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
+		proxies[i] = NewProxy(uint(i), proxyIP, tunnel)
+		tunnels = append(tunnels, tunnel)
 	}
 }

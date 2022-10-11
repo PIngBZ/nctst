@@ -2,6 +2,7 @@ package proxyclient
 
 import (
 	"errors"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -37,8 +38,10 @@ func NewProxyClient(addr string, serverIP string, serverPort int) ProxyClient {
 		}
 
 		return NewTrojanClient(sp[0], host, port, serverIP, serverPort)
+	} else {
+		log.Println("unknown proxy type: " + addr)
+		return nil
 	}
-	return nil
 }
 
 type proxyClient struct {
@@ -62,24 +65,27 @@ func (h *proxyClient) RemoteAddr() net.Addr {
 }
 
 func (h *proxyClient) SetDeadline(t time.Time) error {
-	if h.Conn != nil {
-		return h.Conn.SetDeadline(t)
+	if h.Conn == nil {
+		return io.ErrClosedPipe
 	}
-	return nil
+
+	return h.Conn.SetDeadline(t)
 }
 
 func (h *proxyClient) SetReadDeadline(t time.Time) error {
-	if h.Conn != nil {
-		return h.Conn.SetReadDeadline(t)
+	if h.Conn == nil {
+		return io.ErrClosedPipe
 	}
-	return nil
+
+	return h.Conn.SetReadDeadline(t)
 }
 
 func (h *proxyClient) SetWriteDeadline(t time.Time) error {
-	if h.Conn != nil {
-		return h.Conn.SetWriteDeadline(t)
+	if h.Conn == nil {
+		return io.ErrClosedPipe
 	}
-	return nil
+
+	return h.Conn.SetWriteDeadline(t)
 }
 
 func (h *proxyClient) LastPing() uint {
