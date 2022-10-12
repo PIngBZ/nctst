@@ -8,7 +8,7 @@
 import Foundation
 import ObjectMapper
 
-static let BASE_URL = "http://127.0.0.1:9000"
+let BASE_URL: String = "http://127.0.0.1:9000"
 
 class Response: Mappable {
     var code: Int?
