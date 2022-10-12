@@ -7,3 +7,4 @@ cmd/server/.DS_Store
 cmd/server/flog.txt
 cmd/server/server
 .DS_Store
+cmd/server/data.db
