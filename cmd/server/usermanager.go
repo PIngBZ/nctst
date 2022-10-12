@@ -104,9 +104,9 @@ func (h *UserManager) daemon() {
 
 	r.Get("/initdev", h.initAuthDevice)
 	r.Get("/authcode", h.generateAuthCode)
+	r.Get("/exit", h.exit)
 
 	r.Route("/users", func(r chi.Router) {
-		r.Use(h.checkAdmin)
 		r.Get("/", h.listUsers)
 		r.Get("/add", h.addUser)
 		r.Post("/commit", h.commitUser)
@@ -115,6 +115,8 @@ func (h *UserManager) daemon() {
 			r.Use(h.userCtx)
 			r.Get("/del", h.deleteUser)
 			r.Get("/admin", h.changeAdmin)
+			r.Get("/changepwd", h.changePwd)
+			r.Post("/commitpwd", h.commitPwd)
 		})
 	})
 
@@ -151,23 +153,12 @@ func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 	})
 }
 
-func (h *UserManager) checkAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		name, _, _ := r.BasicAuth()
-
-		if name == "admin" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		user, err := h.dbGetUser(name)
-		if err != nil || !user.Admin {
-			render.Render(w, r, ErrForbidden)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
+func (h *UserManager) isAdmin(r *http.Request) bool {
+	user, success := r.Context().Value(LoginUserContextKey).(*UserInfo)
+	if !success {
+		return false
+	}
+	return user.Admin
 }
 
 func (h *UserManager) userCtx(next http.Handler) http.Handler {
@@ -217,16 +208,25 @@ func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
 }
 
 type ListUserRenderData struct {
+	Me           *UserInfo
 	List         []*UserInfo
 	InitCode     int32
 	InitCodeTime int
 }
 
 func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
+	login, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
 	var id, userName, realName, hash string
 	var admin, status int
 	var lastTime, createTime time.Time
-	cmd := "select id,username,realname,password,admin,lasttime,createtime,status from userinfo order by id"
+	cmd := "select id,username,realname,password,admin,lasttime,createtime,status from userinfo"
+	if !login.Admin {
+		cmd += " where id=" + login.ID
+	} else {
+		cmd += " order by id"
+	}
+
 	rows, err := DB.Query(cmd)
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
@@ -274,8 +274,13 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 		h.initCodeTime.Store(time.Now())
 	}
 
-	sec := time.Until(h.initCodeTime.Load().(time.Time).Add(time.Minute*5)) / time.Second
-	data := ListUserRenderData{List: users, InitCode: int32(h.initCode.Load()), InitCodeTime: int(sec)}
+	var data *ListUserRenderData
+	if login.Admin {
+		sec := time.Until(h.initCodeTime.Load().(time.Time).Add(time.Minute*5)) / time.Second
+		data = &ListUserRenderData{Me: login, List: users, InitCode: int32(h.initCode.Load()), InitCodeTime: int(sec)}
+	} else {
+		data = &ListUserRenderData{Me: login, List: users}
+	}
 
 	err = t.Execute(w, data)
 	if err != nil {
@@ -285,14 +290,18 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserManager) addUser(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
 	t, err := template.ParseFiles("html/edituser.html")
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return
 	}
 
-	user := &UserInfo{}
-	err = t.Execute(w, []*UserInfo{user})
+	err = t.Execute(w, nil)
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return
@@ -300,21 +309,23 @@ func (h *UserManager) addUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
 	r.ParseForm()
 
 	userName := r.Form.Get("username")
-	hash := r.Form.Get("password")
-	hashH := r.Form.Get("passwordH")
+	pwd := r.Form.Get("password")
 	realName := r.Form.Get("realname")
-	if hash == "" {
-		hash = hashH
-	} else {
-		hash = nctst.HashPassword(userName, hash)
-	}
-	if userName == "" || hash == "" || realName == "" {
+
+	if userName == "" || pwd == "" || realName == "" {
 		render.Render(w, r, ErrInvalidRequest(errors.New("params error")))
 		return
 	}
+
+	pwd = nctst.HashPassword(userName, pwd)
 
 	adminS := r.Form.Get("admin")
 	admin := 0
@@ -323,7 +334,7 @@ func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cmd := "insert into userinfo(username,realname,password,admin) values(?,?,?,?)"
-	_, err := DB.Exec(cmd, userName, realName, hash, admin)
+	_, err := DB.Exec(cmd, userName, realName, pwd, admin)
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return
@@ -333,6 +344,11 @@ func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserManager) deleteUser(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
 	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 	_, err := DB.Exec("delete from userinfo where id=?", user.ID)
 	if err != nil {
@@ -344,6 +360,11 @@ func (h *UserManager) deleteUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserManager) changeAdmin(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
 	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 
 	if user.UserName == "admin" {
@@ -356,6 +377,53 @@ func (h *UserManager) changeAdmin(w http.ResponseWriter, r *http.Request) {
 		toAdmin = 0
 	}
 	_, err := DB.Exec("update userinfo set admin=? where id=?", toAdmin, user.ID)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
+}
+
+func (h *UserManager) changePwd(w http.ResponseWriter, r *http.Request) {
+	login, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+	target, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+
+	if !h.isAdmin(r) && login.ID != target.ID {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
+	t, err := template.ParseFiles("html/changepwd.html")
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	err = t.Execute(w, target)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+}
+
+func (h *UserManager) commitPwd(w http.ResponseWriter, r *http.Request) {
+	login, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+	target, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+
+	if !h.isAdmin(r) && login.ID != target.ID {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
+	r.ParseForm()
+	newPwd := r.Form.Get("password")
+	if len(newPwd) < 6 {
+		render.Render(w, r, ErrForbiddenPwdTooShort)
+		return
+	}
+
+	_, err := DB.Exec("update userinfo set password=? where id=?", nctst.HashPassword(target.UserName, newPwd), target.ID)
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return
@@ -428,4 +496,8 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 
 		WriteResponse(w, &InitResponse{Session: session})
 	}
+}
+
+func (h *UserManager) exit(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "exit success", http.StatusUnauthorized)
 }

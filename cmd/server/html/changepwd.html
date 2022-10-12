@@ -16,15 +16,17 @@
 </head>
 
 <body>
-    <form action="/users/commit" method="post">
+    <form action="/users/{{.UserName}}/commitpwd" method="post">
     <div class="table">
         <div class="table-column-group">
+            <div class="table-column"></div>
             <div class="table-column"></div>
             <div class="table-column"></div>
             <div class="table-column"></div>
         </div>
         <div class="table-header-group">
             <ul class="table-row">
+                <li class="table-cell">ID</li>
                 <li class="table-cell">USER</li>
                 <li class="table-cell">NAME</li>
                 <li class="table-cell">PASSWORD</li>
@@ -32,8 +34,9 @@
         </div>
         <div class="table-row-group">
             <ul class="table-row">
-                <li class="table-cell"><input name="username" type="text" width="30"></li>
-                <li class="table-cell"><input name="realname" type="text" width="30"></li>
+                <li class="table-cell">{{.ID}}</li>
+                <li class="table-cell">{{.UserName}}</li>
+                <li class="table-cell">{{.RealName}}</li>
                 <li class="table-cell"><input name="password" type="password" width="30"></li>
             </ul>
         </div>

@@ -8,8 +8,10 @@ import (
 )
 
 const (
-	AppStatusCodeErrLogin = 1001
-	AppStatusCodeNeedInit = 1002
+	AppStatusCodeErrLogin    = 1001
+	AppStatusCodeNeedInit    = 1002
+	AppStatusCodeNeedAdmin   = 1003
+	AppStatusCodePwdTooShort = 1004
 )
 
 type ErrResponse struct {
@@ -53,10 +55,39 @@ func ErrInternal(err error) render.Renderer {
 	}
 }
 
-var ErrNotFound = &ErrResponse{HTTPStatusCode: http.StatusNotFound, StatusText: http.StatusText(http.StatusNotFound)}
-var ErrForbidden = &ErrResponse{HTTPStatusCode: http.StatusForbidden, StatusText: http.StatusText(http.StatusForbidden)}
-var ErrForbiddenErrLogin = &ErrResponse{HTTPStatusCode: http.StatusForbidden, AppCode: AppStatusCodeErrLogin, StatusText: http.StatusText(http.StatusForbidden)}
-var ErrForbiddenNeedInit = &ErrResponse{HTTPStatusCode: http.StatusForbidden, AppCode: AppStatusCodeNeedInit, StatusText: http.StatusText(http.StatusForbidden)}
+var ErrNotFound = &ErrResponse{
+	HTTPStatusCode: http.StatusNotFound,
+	StatusText:     http.StatusText(http.StatusNotFound),
+}
+
+var ErrForbidden = &ErrResponse{
+	HTTPStatusCode: http.StatusForbidden,
+	StatusText:     http.StatusText(http.StatusForbidden),
+}
+
+var ErrForbiddenErrLogin = &ErrResponse{
+	HTTPStatusCode: http.StatusForbidden,
+	AppCode:        AppStatusCodeErrLogin,
+	StatusText:     "username or password error",
+}
+
+var ErrForbiddenNeedInit = &ErrResponse{
+	HTTPStatusCode: http.StatusForbidden,
+	AppCode:        AppStatusCodeNeedInit,
+	StatusText:     "need login and input init code",
+}
+
+var ErrForbiddenNeedAdmin = &ErrResponse{
+	HTTPStatusCode: http.StatusForbidden,
+	AppCode:        AppStatusCodeNeedAdmin,
+	StatusText:     "only admin user can use this interface",
+}
+
+var ErrForbiddenPwdTooShort = &ErrResponse{
+	HTTPStatusCode: http.StatusForbidden,
+	AppCode:        AppStatusCodePwdTooShort,
+	StatusText:     "password can not shorter than 6",
+}
 
 type APIResponseCode int
 
