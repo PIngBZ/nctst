@@ -1,0 +1,135 @@
+PODS:
+  - CRBoxInputView (1.2.1):
+    - Masonry
+  - CryptoSwift (1.5.1)
+  - Differentiator (5.0.0)
+  - FCUUID (1.3.1):
+    - UICKeyChainStore (~> 2.1.0)
+  - HGCircularSlider (2.2.0)
+  - JustIconFont (5.0.0):
+    - JustIconFont/Core (= 5.0.0)
+  - JustIconFont/Core (5.0.0)
+  - libwebp (1.2.3):
+    - libwebp/demux (= 1.2.3)
+    - libwebp/mux (= 1.2.3)
+    - libwebp/webp (= 1.2.3)
+  - libwebp/demux (1.2.3):
+    - libwebp/webp
+  - libwebp/mux (1.2.3):
+    - libwebp/demux
+  - libwebp/webp (1.2.3)
+  - Masonry (1.1.0)
+  - MMKV (1.2.14):
+    - MMKVCore (~> 1.2.14)
+  - MMKVCore (1.2.14)
+  - "NSObject+Rx (5.2.2)":
+    - RxSwift (~> 6.2)
+  - ObjectMapper (4.2.0)
+  - PureLayout (3.1.9)
+  - RxCocoa (6.5.0):
+    - RxRelay (= 6.5.0)
+    - RxSwift (= 6.5.0)
+  - RxDataSources (5.0.0):
+    - Differentiator (~> 5.0)
+    - RxCocoa (~> 6.0)
+    - RxSwift (~> 6.0)
+  - RxRelay (6.5.0):
+    - RxSwift (= 6.5.0)
+  - RxSwift (6.5.0)
+  - RxSwiftExt (6.0.1):
+    - RxSwiftExt/Core (= 6.0.1)
+    - RxSwiftExt/RxCocoa (= 6.0.1)
+  - RxSwiftExt/Core (6.0.1):
+    - RxSwift (~> 6.0)
+  - RxSwiftExt/RxCocoa (6.0.1):
+    - RxCocoa (~> 6.0)
+    - RxSwiftExt/Core
+  - RxViewController (2.0.0):
+    - RxCocoa (~> 6.0)
+    - RxSwift (~> 6.0)
+  - SDWebImage (5.13.2):
+    - SDWebImage/Core (= 5.13.2)
+  - SDWebImage/Core (5.13.2)
+  - SDWebImageWebPCoder (0.9.1):
+    - libwebp (~> 1.0)
+    - SDWebImage/Core (~> 5.13)
+  - Toast-Swift (5.0.1)
+  - UICKeyChainStore (2.1.2)
+  - UIDeviceComplete (2.9.0)
+
+DEPENDENCIES:
+  - CRBoxInputView (= 1.2.1)
+  - CryptoSwift (~> 1.0)
+  - FCUUID
+  - HGCircularSlider (~> 2.2.0)
+  - JustIconFont
+  - MMKV
+  - "NSObject+Rx"
+  - ObjectMapper
+  - PureLayout
+  - RxCocoa
+  - RxDataSources
+  - RxSwift
+  - RxSwiftExt
+  - RxViewController
+  - SDWebImage
+  - SDWebImageWebPCoder
+  - Toast-Swift (~> 5.0.1)
+  - UIDeviceComplete (~> 2.9.0)
+
+SPEC REPOS:
+  trunk:
+    - CRBoxInputView
+    - CryptoSwift
+    - Differentiator
+    - FCUUID
+    - HGCircularSlider
+    - JustIconFont
+    - libwebp
+    - Masonry
+    - MMKV
+    - MMKVCore
+    - "NSObject+Rx"
+    - ObjectMapper
+    - PureLayout
+    - RxCocoa
+    - RxDataSources
+    - RxRelay
+    - RxSwift
+    - RxSwiftExt
+    - RxViewController
+    - SDWebImage
+    - SDWebImageWebPCoder
+    - Toast-Swift
+    - UICKeyChainStore
+    - UIDeviceComplete
+
+SPEC CHECKSUMS:
+  CRBoxInputView: d73a630e5326ee70487b4a56d09daebf915d82fd
+  CryptoSwift: c4f2debceb38bf44c80659afe009f71e23e4a082
+  Differentiator: e8497ceab83c1b10ca233716d547b9af21b9344d
+  FCUUID: bb054fc90cd7cd99320f9f6ff8e130fe607fba05
+  HGCircularSlider: afb1942743a2df156dcc7a3500216e523e14266b
+  JustIconFont: 39913d2a5f85d5fc51459fb9f8b6e2c360597307
+  libwebp: 60305b2e989864154bd9be3d772730f08fc6a59c
+  Masonry: 678fab65091a9290e40e2832a55e7ab731aad201
+  MMKV: 9c4663aa7ca255d478ff10f2f5cb7d17c1651ccd
+  MMKVCore: 89f5c8a66bba2dcd551779dea4d412eeec8ff5bb
+  "NSObject+Rx": 61cf1f7306a73dcef8b36649198af0813ec18dfd
+  ObjectMapper: 1eb41f610210777375fa806bf161dc39fb832b81
+  PureLayout: 5fb5e5429519627d60d079ccb1eaa7265ce7cf88
+  RxCocoa: 94f817b71c07517321eb4f9ad299112ca8af743b
+  RxDataSources: aa47cc1ed6c500fa0dfecac5c979b723542d79cf
+  RxRelay: 1de1523e604c72b6c68feadedd1af3b1b4d0ecbd
+  RxSwift: 5710a9e6b17f3c3d6e40d6e559b9fa1e813b2ef8
+  RxSwiftExt: d61c4b9b06e0a448041b1c659e0f1b5c5a035afc
+  RxViewController: 56486fa0afd629a1d6b5ba077f3b8cd9dc31b5d2
+  SDWebImage: 72f86271a6f3139cc7e4a89220946489d4b9a866
+  SDWebImageWebPCoder: 18503de6621dd2c420d680e33d46bf8e1d5169b0
+  Toast-Swift: 9b6a70f28b3bf0b96c40d46c0c4b9d6639846711
+  UICKeyChainStore: 85db518bb1d294366d15ec9b92a416c4e670518f
+  UIDeviceComplete: 6327826c4182da17310466b99c1979a7f98f7643
+
+PODFILE CHECKSUM: e008d1a38bb4bbac62e6aad64fb591841db112c0
+
+COCOAPODS: 1.11.3
