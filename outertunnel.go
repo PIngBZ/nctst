@@ -29,12 +29,14 @@ type OuterTunnel struct {
 
 	DirectChan chan *BufItem
 
+	CommandManager *CommandManager
+
 	Die chan struct{}
 
 	dieOnce sync.Once
 }
 
-func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan chan *BufItem) *OuterTunnel {
+func NewOuterTunnel(key string, id uint, clientID uint, receiveChan chan *BufItem, sendChan chan *BufItem) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
 	h.ClientID = clientID
@@ -48,13 +50,15 @@ func NewOuterTunnel(id uint, clientID uint, receiveChan chan *BufItem, sendChan 
 	h.outputChan = make(chan *BufItem)
 	h.DirectChan = make(chan *BufItem)
 
+	h.CommandManager = NewCommandManager(key)
+
 	h.Die = make(chan struct{})
 
 	go h.transferLoop()
 	go h.daemon()
 	h.startPing()
 
-	AttachCommandObserver(h.commandReceiveChan)
+	h.CommandManager.AttachCommandObserver(h.commandReceiveChan)
 
 	log.Printf("OuterTunnel.New %d %d\n", clientID, id)
 	return h
@@ -71,7 +75,8 @@ func (h *OuterTunnel) Close() {
 		return
 	}
 
-	DetachCommandObserver(h.commandReceiveChan)
+	h.CommandManager.DetachCommandObserver(h.commandReceiveChan)
+	h.CommandManager.Close()
 	h.RemoveAllConn()
 
 	log.Printf("OuterTunnel.Close %d %d\n", h.ClientID, h.ID)
@@ -83,7 +88,7 @@ func (h *OuterTunnel) AddConn(conn io.ReadWriteCloser, id uint) (outerConn *Oute
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
 
-	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.receiveChan, h.outputChan, h.commandSendChan)
+	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.receiveChan, h.outputChan, h.commandSendChan, h.CommandManager.CommandReceiveChan)
 	h.connections[id] = outer
 
 	return outer

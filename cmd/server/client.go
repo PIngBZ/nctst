@@ -111,7 +111,7 @@ func (h *Client) AddConn(conn *net.TCPConn, tunnelID uint, connID uint) {
 	h.tunnelsLocker.Lock()
 	tunnel, ok := h.tunnels[tunnelID]
 	if !ok {
-		tunnel = nctst.NewOuterTunnel(tunnelID, h.ID, h.kcp.InputChan, h.duplicater.Output)
+		tunnel = nctst.NewOuterTunnel(config.Key, tunnelID, h.ID, h.kcp.InputChan, h.duplicater.Output)
 		h.tunnels[tunnelID] = tunnel
 		atomic.AddUint32(&h.tunnelsListVer, 1)
 	}

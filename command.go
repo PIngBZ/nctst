@@ -9,12 +9,8 @@ import (
 )
 
 var (
-	CommandSignHeader  uint32 = 0xf1f121
-	CommandReceiveChan        = make(chan *BufItem, 8)
-
-	commandPublishObservers = make([]chan *Command, 0)
-	commandPublishLocker    = sync.Mutex{}
-	commandXorKey           string
+	CommandSignHeader uint32 = 0xf1f121
+	commandXorKey     string
 )
 
 type CommandType uint32
@@ -35,43 +31,90 @@ const (
 	Cmd_max
 )
 
-func AttachCommandObserver(observer chan *Command) {
-	commandPublishLocker.Lock()
-	defer commandPublishLocker.Unlock()
+type CommandManager struct {
+	CommandReceiveChan chan *BufItem
 
-	commandPublishObservers = append(commandPublishObservers, observer)
+	commandPublishObservers []chan *Command
+	commandPublishLocker    sync.Mutex
+
+	Die chan struct{}
+
+	dieOnce sync.Once
 }
 
-func DetachCommandObserver(observer chan *Command) {
-	commandPublishLocker.Lock()
-	defer commandPublishLocker.Unlock()
+func NewCommandManager(key string) *CommandManager {
+	h := &CommandManager{}
+	h.CommandReceiveChan = make(chan *BufItem, 8)
+	h.commandPublishObservers = make([]chan *Command, 0)
 
-	for idx, item := range commandPublishObservers {
+	h.Die = make(chan struct{})
+
+	go h.commandDaemon(key)
+	return h
+}
+
+func (h *CommandManager) Close() {
+	var once bool
+	h.dieOnce.Do(func() {
+		close(h.Die)
+		once = true
+	})
+
+	if !once {
+		return
+	}
+
+	h.commandPublishLocker.Lock()
+	defer h.commandPublishLocker.Unlock()
+
+	h.commandPublishObservers = nil
+}
+
+func (h *CommandManager) AttachCommandObserver(observer chan *Command) {
+	h.commandPublishLocker.Lock()
+	defer h.commandPublishLocker.Unlock()
+
+	h.commandPublishObservers = append(h.commandPublishObservers, observer)
+}
+
+func (h *CommandManager) DetachCommandObserver(observer chan *Command) {
+	h.commandPublishLocker.Lock()
+	defer h.commandPublishLocker.Unlock()
+
+	for idx, item := range h.commandPublishObservers {
 		if item == observer {
-			commandPublishObservers = append(commandPublishObservers[:idx], commandPublishObservers[idx+1:]...)
+			h.commandPublishObservers = append(h.commandPublishObservers[:idx], h.commandPublishObservers[idx+1:]...)
 			return
 		}
 	}
 }
 
-func CommandDaemon(key string) {
+func (h *CommandManager) commandDaemon(key string) {
 	commandXorKey = key
-	for buf := range CommandReceiveChan {
-		if cmd, err := ReadCommand(buf); err == nil {
-			publishCommand(cmd)
-		} else {
-			log.Printf("CommandDaemon CommandFromBuf error: %+v %d\n", err, buf.Size())
+
+	for {
+		select {
+		case <-h.Die:
+			return
+		case buf := <-h.CommandReceiveChan:
+			if cmd, err := ReadCommand(buf); err == nil {
+				h.publishCommand(cmd)
+			} else {
+				log.Printf("CommandDaemon CommandFromBuf error: %+v %d\n", err, buf.Size())
+			}
+			buf.Release()
 		}
-		buf.Release()
 	}
 }
 
-func publishCommand(cmd *Command) {
-	commandPublishLocker.Lock()
-	defer commandPublishLocker.Unlock()
+func (h *CommandManager) publishCommand(cmd *Command) {
+	h.commandPublishLocker.Lock()
+	defer h.commandPublishLocker.Unlock()
 
-	for _, observer := range commandPublishObservers {
+	for _, observer := range h.commandPublishObservers {
 		select {
+		case <-h.Die:
+			return
 		case observer <- cmd:
 		default:
 		}

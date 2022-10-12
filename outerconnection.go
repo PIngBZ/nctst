@@ -12,15 +12,19 @@ type OuterConnection struct {
 	TunnelID uint
 	Die      chan struct{}
 
-	conn        io.ReadWriteCloser
-	receiveChan chan *BufItem
-	sendChan    chan *BufItem
-	commandChan chan *Command
+	conn               io.ReadWriteCloser
+	receiveChan        chan *BufItem
+	sendChan           chan *BufItem
+	commandChan        chan *Command
+	commandReceiveChan chan *BufItem
 
 	dieOnce sync.Once
 }
 
-func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn io.ReadWriteCloser, receiveChan chan *BufItem, sendChan chan *BufItem, commandChan chan *Command) *OuterConnection {
+func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn io.ReadWriteCloser,
+	receiveChan chan *BufItem, sendChan chan *BufItem,
+	commandChan chan *Command, commandReceiveChan chan *BufItem) *OuterConnection {
+
 	h := &OuterConnection{}
 	h.ID = id
 	h.ClientID = clientID
@@ -30,6 +34,7 @@ func NewOuterConnection(clientID uint, tunnelID uint, id uint, conn io.ReadWrite
 	h.receiveChan = receiveChan
 	h.sendChan = sendChan
 	h.commandChan = commandChan
+	h.commandReceiveChan = commandReceiveChan
 
 	h.Die = make(chan struct{})
 	once := &sync.Once{}
@@ -72,7 +77,7 @@ func (h *OuterConnection) receiveLoop(conn io.ReadWriteCloser, once *sync.Once) 
 
 		if IsCommand(buf) {
 			select {
-			case CommandReceiveChan <- buf:
+			case h.commandReceiveChan <- buf:
 			case <-h.Die:
 				buf.Release()
 				return

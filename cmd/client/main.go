@@ -53,8 +53,6 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
-
-	go nctst.CommandDaemon(config.Key)
 }
 
 func main() {
@@ -119,7 +117,7 @@ func startUpstreamProxies() {
 	proxies = make([]*Proxy, len(proxyList))
 
 	for i, proxyIP := range config.Proxies {
-		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
+		tunnel := nctst.NewOuterTunnel(config.Key, uint(i), ClientID, kcp.InputChan, duplicater.Output)
 		proxies[i] = NewProxy(uint(i), proxyIP, tunnel)
 		tunnels = append(tunnels, tunnel)
 	}

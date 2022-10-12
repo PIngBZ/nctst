@@ -7,6 +7,11 @@ import (
 	"github.com/go-chi/render"
 )
 
+const (
+	AppStatusCodeErrLogin = 1001
+	AppStatusCodeNeedInit = 1002
+)
+
 type ErrResponse struct {
 	Err            error `json:"-"`
 	HTTPStatusCode int   `json:"code"`
@@ -50,6 +55,8 @@ func ErrInternal(err error) render.Renderer {
 
 var ErrNotFound = &ErrResponse{HTTPStatusCode: http.StatusNotFound, StatusText: http.StatusText(http.StatusNotFound)}
 var ErrForbidden = &ErrResponse{HTTPStatusCode: http.StatusForbidden, StatusText: http.StatusText(http.StatusForbidden)}
+var ErrForbiddenErrLogin = &ErrResponse{HTTPStatusCode: http.StatusForbidden, AppCode: AppStatusCodeErrLogin, StatusText: http.StatusText(http.StatusForbidden)}
+var ErrForbiddenNeedInit = &ErrResponse{HTTPStatusCode: http.StatusForbidden, AppCode: AppStatusCodeNeedInit, StatusText: http.StatusText(http.StatusForbidden)}
 
 type APIResponseCode int
 

@@ -134,14 +134,13 @@ func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 		if err != nil {
 			log.Printf("basicAuth dbGetUser error %+v\n", err)
 			time.Sleep(time.Second * 2)
-			render.Render(w, r, ErrForbidden)
+			render.Render(w, r, ErrForbiddenErrLogin)
 			return
 		}
 
 		if nctst.HashPassword(name, pass) != user.Hash {
 			time.Sleep(time.Second * 5)
-			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
-			w.WriteHeader(http.StatusUnauthorized)
+			render.Render(w, r, ErrForbiddenErrLogin)
 			return
 		}
 
@@ -372,7 +371,7 @@ func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
 
 	session := r.Form.Get("session")
 	if session != user.Session {
-		render.Render(w, r, ErrForbidden)
+		render.Render(w, r, ErrForbiddenNeedInit)
 		return
 	}
 
