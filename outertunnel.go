@@ -50,7 +50,7 @@ func NewOuterTunnel(key string, id uint, clientID uint, receiveChan chan *BufIte
 	h.outputChan = make(chan *BufItem)
 	h.DirectChan = make(chan *BufItem)
 
-	h.CommandManager = NewCommandManager(key)
+	h.CommandManager = NewCommandManager()
 
 	h.Die = make(chan struct{})
 

@@ -36,6 +36,8 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
+
+	nctst.CommandXorKey = config.Key
 }
 
 func main() {

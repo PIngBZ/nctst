@@ -1,10 +1,9 @@
 
-cmd/.DS_Store
-cmd/client/.DS_Store
-cmd/client/client
-cmd/client/flog.txt
-cmd/server/.DS_Store
-cmd/server/flog.txt
-cmd/server/server
 .DS_Store
-cmd/server/data.db
+client/.DS_Store
+client/client
+client/flog.txt
+server/.DS_Store
+server/flog.txt
+server/server
+server/data.db

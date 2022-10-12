@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/cmd/client/proxylist"
+	"github.com/PIngBZ/nctst/proxy/proxylist"
 	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
@@ -53,6 +53,8 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
+
+	nctst.CommandXorKey = config.Key
 }
 
 func main() {

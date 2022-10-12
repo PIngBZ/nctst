@@ -8,9 +8,12 @@ import (
 	"sync"
 )
 
+const (
+	commandSignHeader uint32 = 0xf1f121
+)
+
 var (
-	CommandSignHeader uint32 = 0xf1f121
-	commandXorKey     string
+	CommandXorKey string
 )
 
 type CommandType uint32
@@ -42,14 +45,14 @@ type CommandManager struct {
 	dieOnce sync.Once
 }
 
-func NewCommandManager(key string) *CommandManager {
+func NewCommandManager() *CommandManager {
 	h := &CommandManager{}
 	h.CommandReceiveChan = make(chan *BufItem, 8)
 	h.commandPublishObservers = make([]chan *Command, 0)
 
 	h.Die = make(chan struct{})
 
-	go h.commandDaemon(key)
+	go h.commandDaemon()
 	return h
 }
 
@@ -89,9 +92,7 @@ func (h *CommandManager) DetachCommandObserver(observer chan *Command) {
 	}
 }
 
-func (h *CommandManager) commandDaemon(key string) {
-	commandXorKey = key
-
+func (h *CommandManager) commandDaemon() {
 	for {
 		select {
 		case <-h.Die:
@@ -128,13 +129,13 @@ func SendCommand(conn io.Writer, command *Command) error {
 		return err
 	}
 	data := []byte(js)
-	Xor(data, []byte(commandXorKey))
+	Xor(data, []byte(CommandXorKey))
 
 	if err := WriteUInt(conn, uint32(len(js)+8)); err != nil {
 		return err
 	}
 
-	if err := WriteUInt(conn, CommandSignHeader); err != nil {
+	if err := WriteUInt(conn, commandSignHeader); err != nil {
 		return err
 	}
 
@@ -153,7 +154,7 @@ func IsCommand(buf *BufItem) bool {
 	if buf.Size() < 16 {
 		return false
 	}
-	if ToUint(buf.Data()[:4]) != CommandSignHeader {
+	if ToUint(buf.Data()[:4]) != commandSignHeader {
 		return false
 	}
 	if ToUint(buf.Data()[4:8]) >= uint32(Cmd_max) {
@@ -176,12 +177,12 @@ func GetCommandType(buf *BufItem) CommandType {
 }
 
 func ReadCommand(buf *BufItem) (*Command, error) {
-	if sign, _ := ReadUInt(buf); sign != CommandSignHeader {
+	if sign, _ := ReadUInt(buf); sign != commandSignHeader {
 		return nil, fmt.Errorf("CommandSignHeader error %d", sign)
 	}
 
 	t, _ := ReadUInt(buf)
-	Xor(buf.Data(), []byte(commandXorKey))
+	Xor(buf.Data(), []byte(CommandXorKey))
 	s := string(buf.Data())
 
 	var obj interface{}
