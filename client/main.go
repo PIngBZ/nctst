@@ -4,10 +4,12 @@ import (
 	"errors"
 	"flag"
 	"log"
+	"math/rand"
 	"net"
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/nctst/proxy/proxylist"
 	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
@@ -16,6 +18,7 @@ var (
 	UUID     = uuid.NewString()
 	ClientID uint
 
+	authCode   int
 	configFile string
 	config     *Config
 
@@ -23,23 +26,35 @@ var (
 	proxies    = []*Proxy{}
 	tunnels    = make([]*nctst.OuterTunnel, 0)
 	duplicater *nctst.Duplicater
+
+	connKey string
 )
 
 func init() {
+	rand.Seed(time.Now().Unix())
 	nctst.OpenLog()
 
+	flag.IntVar(&authCode, "d", 0, "auth code")
 	flag.StringVar(&configFile, "c", "", "configure file")
 	flag.Parse()
 
+	if authCode == 0 {
+		log.Println("Attention, no auth code. Only test environment can work.")
+	}
+
 	if configFile == "" {
-		nctst.CheckError(errors.New("no config file"))
+		if exist, _ := nctst.PathExists("config.json"); !exist {
+			nctst.CheckError(errors.New("no config file"))
+		} else {
+			configFile = "config.json"
+		}
 	}
 
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
 
-	go nctst.CommandDaemon()
+	nctst.CommandXorKey = config.Key
 }
 
 func main() {
@@ -89,11 +104,23 @@ func main() {
 }
 
 func startUpstreamProxies() {
-	proxies = make([]*Proxy, len(config.Proxies))
+	var proxyList []string
+	if len(config.Proxies) != 0 {
+		proxyList = config.Proxies
+	} else if len(config.ProxyFile) > 0 {
+		proxyList = proxylist.GetProxyList(config.ProxyFile)
+		if len(proxyList) == 0 {
+			nctst.CheckError(errors.New("can not get proxy server list"))
+		}
+	} else {
+		nctst.CheckError(errors.New("no proxy server"))
+	}
 
-	for i, serverIP := range config.Proxies {
-		tunnel := nctst.NewOuterTunnel(uint(i), ClientID, kcp.InputChan, duplicater.Output)
-		proxies[i] = NewProxy(uint(i), serverIP, tunnel)
+	proxies = make([]*Proxy, len(proxyList))
+
+	for i, proxyIP := range config.Proxies {
+		tunnel := nctst.NewOuterTunnel(config.Key, uint(i), ClientID, kcp.InputChan, duplicater.Output)
+		proxies[i] = NewProxy(uint(i), proxyIP, tunnel)
 		tunnels = append(tunnels, tunnel)
 	}
 }

@@ -1,0 +1,46 @@
+<html>
+
+<head>
+    <style>
+        ul{margin:0;padding:0;list-style:none;}  
+        .table{display:table;border-collapse:collapse;border:1px solid #ccc;}  
+        .table-caption{display:table-caption;margin:0;padding:0;font-size:16px;}  
+        .table-column-group{display:table-column-group;}  
+        .table-column{display:table-column;width:200px;}  
+        .table-row-group{display:table-row-group;}  
+        .table-row{display:table-row;}  
+        .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
+        .table-cell{display:table-cell;padding:5px;border:1px solid #ccc;}  
+        .table-header-group{display:table-header-group;background:#eee;font-weight:bold;}  
+    </style>
+</head>
+
+<body>
+    <form action="/users/commit" method="post">
+    <div class="table">
+        <div class="table-column-group">
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+        </div>
+        <div class="table-header-group">
+            <ul class="table-row">
+                <li class="table-cell">USER</li>
+                <li class="table-cell">NAME</li>
+                <li class="table-cell">PASSWORD</li>
+            </ul>
+        </div>
+        <div class="table-row-group">
+            <ul class="table-row">
+                <li class="table-cell"><input name="username" type="text" width="30"></li>
+                <li class="table-cell"><input name="realname" type="text" width="30"></li>
+                <li class="table-cell"><input name="password" type="password" width="30"></li>
+            </ul>
+        </div>
+    </div>
+    <input type="submit" width="20">
+    <a href="/users">返回</a>
+    </form>
+</body>
+
+</html>

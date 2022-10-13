@@ -6,9 +6,12 @@ import (
 )
 
 type Config struct {
-	Listen string `json:"listen"`
-	Target string `json:"target"`
-	Key    string `json:"key"`
+	Listen        string `json:"listen"`
+	Target        string `json:"target"`
+	Key           string `json:"key"`
+	AdminListen   string `json:"adminlisten"`
+	AdminPassword string `json:"adminpwd"`
+	Test          bool   `json:"test"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

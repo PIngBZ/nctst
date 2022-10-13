@@ -1,0 +1,38 @@
+#install! 'cocoapods', :deterministic_uuids => false
+#install! 'cocoapods', :deterministic_uuids => false, :integrate_targets => false
+
+inhibit_all_warnings!
+
+target 'nctstauth' do
+  platform :ios, '15.0'
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  pod 'RxSwift'
+  pod 'RxCocoa'
+  pod 'RxSwiftExt'
+  pod 'NSObject+Rx'
+  pod 'RxViewController'
+  pod 'RxDataSources'
+  pod 'ObjectMapper'
+  pod 'SDWebImage'
+  pod 'SDWebImageWebPCoder'
+  pod 'UIDeviceComplete', '~> 2.9.0'
+  pod 'CryptoSwift', '~> 1.0'
+  pod 'PureLayout'
+  pod 'FCUUID'
+  pod 'MMKV'
+  pod 'Toast-Swift', '~> 5.0.1'
+  pod 'JustIconFont'
+  pod 'CRBoxInputView', '1.2.1'
+  pod 'HGCircularSlider', '~> 2.2.0'
+end
+
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
+  end
+end

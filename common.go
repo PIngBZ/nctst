@@ -1,21 +1,33 @@
 package nctst
 
 import (
+	"crypto/md5"
+	"crypto/sha1"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
+	"net"
 	"os"
+	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/xtaci/smux"
 )
 
 var (
-	DataBufPool = NewPool(DATA_BUF_SIZE)
+	DataBufPool          = NewPool(DATA_BUF_SIZE)
+	DelayCloseNum uint32 = 0
 )
+
+type ContextKey struct {
+	Key string
+}
 
 func CheckError(err error) {
 	if err != nil {
@@ -79,6 +91,14 @@ func Max(x, y int) int {
 		return x
 	}
 	return y
+}
+
+func Xor(data []byte, key []byte) {
+	kn := 0
+	for i, v := range data {
+		data[i] = v ^ key[kn]
+		kn = (kn + 1) % len(key)
+	}
 }
 
 func ToUint(data []byte) uint32 {
@@ -174,4 +194,50 @@ func ReadLBuf(reader io.Reader) (*BufItem, error) {
 		return nil, err
 	}
 	return buf, nil
+}
+
+func HashPassword(username, password string) string {
+	p := sha1.Sum([]byte(password))
+	k := append([]byte(username), p[:]...)
+	m := md5.Sum([]byte(k))
+	return string(hex.EncodeToString(m[:]))
+}
+
+func DelayClose(conn io.Closer) {
+	if atomic.LoadUint32(&DelayCloseNum) > 1000 {
+		conn.Close()
+		return
+	}
+
+	atomic.AddUint32(&DelayCloseNum, 1)
+	go func() {
+		time.Sleep(time.Second * time.Duration(60+rand.Intn(60)))
+		conn.Close()
+		atomic.AddUint32(&DelayCloseNum, ^uint32(0))
+	}()
+}
+
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
+}
+
+func SplitHostPort(addr string) (string, int, error) {
+	host, portS, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "", 0, err
+	}
+
+	port, err := strconv.Atoi(portS)
+	if err != nil {
+		return "", 0, err
+	}
+
+	return host, port, nil
 }

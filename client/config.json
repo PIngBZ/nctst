@@ -1,0 +1,14 @@
+{
+    "username": "test",
+    "password": "test",
+    "listen": ":6101",
+    "serverIP": "127.0.0.1",
+    "serverPort": "8000",
+    "proxies": ["socks5:127.0.0.1:8889", "socks5:127.0.0.1:8899", "socks5:127.0.0.1:8889", "socks5:127.0.0.1:8899"],
+    "proxyfile": "proxylist.txt",
+    "connperproxy": 5,
+    "compress": false,
+    "tartype": "socks5",
+    "key": "123",
+    "duplicate": 2
+}

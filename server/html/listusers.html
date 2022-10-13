@@ -1,0 +1,109 @@
+<html>
+
+<head>
+    <style>
+        ul{margin:0;padding:0;list-style:none;}  
+        .table{display:table;border-collapse:collapse;border:1px solid #ccc;}  
+        .table-caption{display:table-caption;margin:0;padding:0;font-size:16px;}  
+        .table-column-group{display:table-column-group;}  
+        .table-column{display:table-column;width:130px;}  
+        .table-row-group{display:table-row-group;}  
+        .table-row{display:table-row;}  
+        .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
+        .table-cell{display:table-cell;padding:5px;border:1px solid #ccc;}  
+        .table-header-group{display:table-header-group;background:#eee;font-weight:bold;}  
+    </style>
+</head>
+
+<body>
+    {{if .Me.Admin}}
+        {{.InitCode}}
+        {{.InitCodeTime}}
+    {{end}}
+    <div class="table">
+        <div class="table-column-group">
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            {{if .Me.Admin}}
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            {{end}}
+        </div>
+        <div class="table-header-group">
+            <ul class="table-row">
+                <li class="table-cell">ID</li>
+                <li class="table-cell">USER</li>
+                <li class="table-cell">NAME</li>
+                <li class="table-cell">LASTUSE</li>
+                <li class="table-cell">CREATE</li>
+
+                {{if .Me.Admin}}
+                <li class="table-cell">ADMIN</li>
+                <li class="table-cell">CODE</li>
+                <li class="table-cell">SECONDS</li>
+                {{end}}
+                
+                <li class="table-cell">PASSWORD</li>
+
+                {{if .Me.Admin}}
+                <li class="table-cell">DELETE</li>
+                {{end}}
+            </ul>
+        </div>
+        <div class="table-row-group">
+            {{$me := .Me}}
+            {{range .List}}
+            <ul class="table-row">
+                <li class="table-cell">{{.ID}}</li>
+                <li class="table-cell">{{.UserName}}</li>
+                <li class="table-cell">{{.RealName}}</li>
+                <li class="table-cell">{{.LastTime}}</li>
+                <li class="table-cell">{{.CreateTime}}</li>
+
+                {{if $me.Admin}}
+                    <li class="table-cell">
+                        {{.Admin}} 
+                        {{if ne .UserName "admin"}}
+                            [<a href="/users/{{.UserName}}/admin">change</a>]
+                        {{end}}
+                    </li>
+                    <li class="table-cell">
+                        {{if .CodeInfo}}
+                            {{.CodeInfo.Code}}
+                        {{end}}
+                    </li>
+                    <li class="table-cell">
+                        {{if .CodeInfo}}
+                            {{.CodeInfo.Seconds}}
+                        {{end}}
+                    </li>
+                {{end}}
+
+                <li class="table-cell">
+                    {{if ne .UserName "admin"}}
+                        <a href="/users/{{.UserName}}/changepwd">Change</a>
+                	{{end}}
+                </li>
+
+                {{if $me.Admin}}
+                    <li class="table-cell">
+                        {{if ne .UserName "admin"}}
+                            <a href="/users/{{.UserName}}/del">Del</a>
+                        {{end}}
+                    </li>
+                {{end}}
+            </ul>
+            {{end}}
+        </div>
+    </div>
+    <a href="/users/add">Add User</a>&nbsp; &nbsp; 
+    <a href="/exit">Exit</a>
+</body>
+
+</html>

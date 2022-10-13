@@ -1,0 +1,8 @@
+{
+    "listen": ":8000",
+    "target": "192.168.1.10:6101",
+    "key": "123",
+    "adminlisten": ":9000",
+    "adminpwd": "admin",
+    "test": false
+}

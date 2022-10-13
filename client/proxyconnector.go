@@ -2,92 +2,83 @@ package main
 
 import (
 	"errors"
+	"io"
 	"log"
-	"net"
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/haochen233/socks5"
+	"github.com/PIngBZ/nctst/proxy/proxyclient"
 )
 
 var (
-	ErrorNeedLogin = errors.New("error need login")
+	ErrorNeedLogin = errors.New("error need login, exit, perhaps server restarted")
 )
 
 type ProxyConnector struct {
 	ID      uint
 	ProxyID uint
-	Address string
 
+	client proxyclient.ProxyClient
 	tunnel *nctst.OuterTunnel
 
-	outerDieSignal chan struct{}
+	outerConnection *nctst.OuterConnection
 }
 
-func NewProxyConnector(id uint, proxyID uint, addr string, tunnel *nctst.OuterTunnel) *ProxyConnector {
+func NewProxyConnector(id uint, proxyID uint, client proxyclient.ProxyClient, tunnel *nctst.OuterTunnel) *ProxyConnector {
 	h := &ProxyConnector{}
 	h.ID = id
 	h.ProxyID = proxyID
-	h.Address = addr
+	h.client = client
 
 	h.tunnel = tunnel
 
 	go h.daemon()
 
-	log.Printf("new proxy connector %d %d\n", proxyID, id)
+	log.Printf("ProxyConnector.New %d %d\n", proxyID, id)
 	return h
 }
 
-func (h *ProxyConnector) connect() bool {
+func (h *ProxyConnector) connect() {
 	log.Printf("ProxyConnector connecting %d %d\n", h.ProxyID, h.ID)
 
-	client := socks5.Client{
-		ProxyAddr: h.Address,
-		Timeout:   time.Second * 5,
-		Auth: map[socks5.METHOD]socks5.Authenticator{
-			socks5.NO_AUTHENTICATION_REQUIRED: &socks5.NoAuth{},
-		},
-	}
-	var conn *net.TCPConn
 	for {
 		var err error
-		conn, err = client.Connect(socks5.Version5, config.ServerIP+":"+config.ServerPort)
+		err = h.client.Connect()
 
 		if err != nil {
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
-		conn.SetDeadline(time.Now().Add(time.Second * 5))
+		h.client.SetDeadline(time.Now().Add(time.Second * 5))
 
-		if err = h.sendHandshake(conn); err != nil {
-			conn.Close()
+		if err = h.sendHandshake(h.client); err != nil {
+			h.client.Close()
 			log.Printf("sendHandshake error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
 
-		if err = h.receiveHandshakeReply(conn); err == ErrorNeedLogin {
-			conn.Close()
-			log.Printf("receiveHandshakeReply Error need login, exit\n")
-			return false
+		if err = h.receiveHandshakeReply(h.client); err == ErrorNeedLogin {
+			h.client.Close()
+			nctst.CheckError(err)
+			return
 		} else if err != nil {
-			conn.Close()
-			log.Printf("sendHandshake error %+v\n", err)
+			h.client.Close()
+			log.Printf("receiveHandshakeReply error %+v\n", err)
 			time.Sleep(time.Second * 5)
 			continue
 		}
 		break
 	}
 
-	conn.SetDeadline(time.Time{})
-	h.outerDieSignal = h.tunnel.AddConn(conn, h.ID)
+	h.client.SetDeadline(time.Time{})
+	h.outerConnection = h.tunnel.AddConn(h.client, h.ID)
 
 	log.Printf("ProxyConnector connect success %d %d\n", h.ProxyID, h.ID)
-	return true
 }
 
-func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
+func (h *ProxyConnector) sendHandshake(conn io.Writer) error {
 	if err := nctst.WriteUInt(conn, nctst.NEW_CONNECTION_KEY); err != nil {
 		return err
 	}
@@ -97,11 +88,11 @@ func (h *ProxyConnector) sendHandshake(conn *net.TCPConn) error {
 	cmd.ClientID = ClientID
 	cmd.TunnelID = h.tunnel.ID
 	cmd.ConnID = h.ID
-	cmd.Key = config.Key
+	cmd.ConnectKey = connKey
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_handshake, Item: cmd})
 }
 
-func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
+func (h *ProxyConnector) receiveHandshakeReply(conn io.Reader) error {
 	buf, err := nctst.ReadLBuf(conn)
 	if err != nil {
 		return err
@@ -129,19 +120,19 @@ func (h *ProxyConnector) receiveHandshakeReply(conn *net.TCPConn) error {
 
 func (h *ProxyConnector) daemon() {
 	h.connect()
+
 	for {
 		select {
-		case <-h.outerDieSignal:
-			h.tunnel.Remove(h.ID)
-			if !h.reconnect() {
-				return
-			}
+		case <-h.outerConnection.Die:
+			h.tunnel.RemoveConn(h.ID)
+			h.reconnect()
 		}
 	}
 }
 
-func (h *ProxyConnector) reconnect() bool {
+func (h *ProxyConnector) reconnect() {
 	log.Printf("ProxyConnector waiting 5s to reconnect %d %d\n", h.ProxyID, h.ID)
-	<-time.After(time.Second * 5)
-	return h.connect()
+
+	time.Sleep(time.Second * 5)
+	h.connect()
 }
