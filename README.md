@@ -85,6 +85,9 @@ redsocks {
 IP和Port等都是随手写的，具体自行google配置
 
 
+可以通过http://adminaddr/users访问用户管理页面，增删改查用户以及获取鉴权手机App初始化code
+
+
 感谢：
 
 SMUX: https://github.com/xtaci/smux
