@@ -18,11 +18,16 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 2. 负载均衡
 
-3. KCP
+3. 多线路并发选取最快到达
 
-4. 数据压缩
+3. 数据压缩
 
-5. key认证通过才能连接
+4. 认证加密
+
+5. 多用户
+
+6. 手机App生成验证码登录(iOS客户端，Flutter客户端)
+
 
 
 <h3>后续计划支持：</h3>
@@ -55,7 +60,7 @@ server:
 
 
 client:
-./client -c config.json
+./client -c config.json -d authcode
 
 
 
