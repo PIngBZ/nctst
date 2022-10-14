@@ -4,5 +4,6 @@
     "key": "123",
     "adminlisten": ":9000",
     "adminpwd": "admin",
+    "localnetmask": "192.168.100/24",
     "test": false
 }

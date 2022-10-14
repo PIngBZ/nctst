@@ -48,6 +48,7 @@ type UserInfo struct {
 	CreateTime time.Time
 	Status     UserStatus
 	CodeInfo   *CodeInfo
+	Proxy      bool
 }
 
 type CodeInfo struct {
@@ -63,9 +64,6 @@ type UserManager struct {
 }
 
 func (h *UserManager) CheckUserPassword(username, hash string) bool {
-	if username == "admin" && hash == config.AdminPassword {
-		return true
-	}
 	var count int
 	err := DB.QueryRow("select count(*) from userinfo where username=? and password=?", username, hash).Scan(&count)
 	if err != nil {
@@ -117,6 +115,7 @@ func (h *UserManager) daemon() {
 			r.Get("/admin", h.changeAdmin)
 			r.Get("/changepwd", h.changePwd)
 			r.Post("/commitpwd", h.commitPwd)
+			r.Get("/proxy", h.changeProxy)
 		})
 	})
 
@@ -132,9 +131,9 @@ func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		user, err := h.dbGetUser(name)
+		user, err := h.GetUser(name)
 		if err != nil {
-			log.Printf("basicAuth dbGetUser error %+v\n", err)
+			log.Printf("basicAuth GetUser error %+v\n", err)
 			time.Sleep(time.Second * 2)
 			render.Render(w, r, ErrForbiddenErrLogin)
 			return
@@ -166,7 +165,7 @@ func (h *UserManager) userCtx(next http.Handler) http.Handler {
 		var user *UserInfo
 		var err error
 		if username := chi.URLParam(r, "username"); username != "" {
-			user, err = h.dbGetUser(username)
+			user, err = h.GetUser(username)
 		} else {
 			render.Render(w, r, ErrNotFound)
 			return
@@ -180,12 +179,12 @@ func (h *UserManager) userCtx(next http.Handler) http.Handler {
 	})
 }
 
-func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
+func (h *UserManager) GetUser(username string) (*UserInfo, error) {
 	var id, realName, hash, session string
-	var admin, status int
+	var admin, status, proxy int
 	var lastTime, createTime time.Time
-	cmd := "select id,realname,password,admin,session,lasttime,createtime,status from userinfo where username=?"
-	if err := DB.QueryRow(cmd, username).Scan(&id, &realName, &hash, &admin, &session, &lastTime, &createTime, &status); err != nil {
+	cmd := "select id,realname,password,admin,session,lasttime,createtime,status,proxy from userinfo where username=?"
+	if err := DB.QueryRow(cmd, username).Scan(&id, &realName, &hash, &admin, &session, &lastTime, &createTime, &status, &proxy); err != nil {
 		return nil, err
 	}
 	user := &UserInfo{}
@@ -198,6 +197,7 @@ func (h *UserManager) dbGetUser(username string) (*UserInfo, error) {
 	user.LastTime = lastTime
 	user.CreateTime = createTime
 	user.Status = UserStatus(status)
+	user.Proxy = proxy == 1
 
 	if c, loaded := h.authCodes.Load(username); loaded {
 		user.CodeInfo = c.(*CodeInfo)
@@ -218,9 +218,9 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 	login, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
 
 	var id, userName, realName, hash string
-	var admin, status int
+	var admin, status, proxy int
 	var lastTime, createTime time.Time
-	cmd := "select id,username,realname,password,admin,lasttime,createtime,status from userinfo"
+	cmd := "select id,username,realname,password,admin,lasttime,createtime,status,proxy from userinfo"
 	if !login.Admin {
 		cmd += " where id=" + login.ID
 	} else {
@@ -236,7 +236,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 
 	users := make([]*UserInfo, 0)
 	for rows.Next() {
-		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status); err != nil {
+		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status, &proxy); err != nil {
 			render.Render(w, r, ErrInternal(err))
 			return
 		}
@@ -249,6 +249,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 		user.LastTime = lastTime
 		user.CreateTime = createTime
 		user.Status = UserStatus(status)
+		user.Proxy = proxy == 1
 
 		if c, loaded := h.authCodes.Load(userName); loaded {
 			user.CodeInfo = c.(*CodeInfo)
@@ -295,7 +296,7 @@ func (h *UserManager) addUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, err := template.ParseFiles("html/edituser.html")
+	t, err := template.ParseFiles("html/adduser.html")
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return
@@ -424,6 +425,27 @@ func (h *UserManager) commitPwd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err := DB.Exec("update userinfo set password=? where id=?", nctst.HashPassword(target.UserName, newPwd), target.ID)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
+}
+
+func (h *UserManager) changeProxy(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
+	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+
+	toOpenProxy := 1
+	if user.Proxy {
+		toOpenProxy = 0
+	}
+	_, err := DB.Exec("update userinfo set proxy=? where id=?", toOpenProxy, user.ID)
 	if err != nil {
 		render.Render(w, r, ErrInternal(err))
 		return

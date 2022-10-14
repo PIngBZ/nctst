@@ -16,6 +16,7 @@ import (
 )
 
 type Client struct {
+	User    *UserInfo
 	UUID    string
 	ID      uint
 	ConnKey string
@@ -33,8 +34,9 @@ type Client struct {
 	dieOnce sync.Once
 }
 
-func NewClient(uuid string, id uint, compress bool, duplicateNum int, tarType string) *Client {
+func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum int, tarType string) *Client {
 	h := &Client{}
+	h.User = user
 	h.UUID = uuid
 	h.ID = id
 	k := md5.Sum([]byte(uuid))
@@ -149,13 +151,14 @@ func (h *Client) connectTarget(conn net.Conn) {
 
 func (h *Client) listenAndServeSocks5() {
 	h.socks5 = &socks5.Server{
-		Addr:                  config.Listen,
-		Authenticators:        nil,
-		DisableSocks4:         true,
-		Transporter:           h,
-		DialTimeout:           time.Second * 5,
-		HandshakeReadTimeout:  time.Second * 5,
-		HandshakeWriteTimeout: time.Second * 5,
+		Addr:                   config.Listen,
+		Authenticators:         nil,
+		DisableSocks4:          true,
+		Transporter:            h,
+		DialTimeout:            time.Second * 5,
+		HandshakeReadTimeout:   time.Second * 5,
+		HandshakeWriteTimeout:  time.Second * 5,
+		CallbackAfterHandshake: h.CallbackAfterHandshake,
 	}
 
 	h.socks5.Serve(h.listener)
@@ -168,4 +171,15 @@ func (t *Client) TransportStream(client io.ReadWriteCloser, remote io.ReadWriteC
 
 func (t *Client) TransportUDP(server *socks5.UDPConn, request *socks5.Request) error {
 	return nil
+}
+
+func (t *Client) CallbackAfterHandshake(srv *socks5.Server, req *socks5.Request) bool {
+	if !t.User.Proxy && len(config.Localnetmask) > 0 {
+		_, ipNet, err := net.ParseCIDR(config.Localnetmask)
+		if err != nil {
+			return true
+		}
+		return ipNet.Contains(req.Address.Addr)
+	}
+	return true
 }

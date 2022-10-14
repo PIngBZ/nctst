@@ -9,9 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"sync/atomic"
@@ -240,4 +242,24 @@ func SplitHostPort(addr string) (string, int, error) {
 	}
 
 	return host, port, nil
+}
+
+func HttpGetString(url string) (string, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HttpGetString Code=%d %s", resp.StatusCode, url)
+	}
+
+	return string(body), nil
 }

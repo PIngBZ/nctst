@@ -33,6 +33,7 @@
             <div class="table-column"></div>
             <div class="table-column"></div>
             <div class="table-column"></div>
+            <div class="table-column"></div>
             {{end}}
         </div>
         <div class="table-header-group">
@@ -52,6 +53,7 @@
                 <li class="table-cell">PASSWORD</li>
 
                 {{if .Me.Admin}}
+                <li class="table-cell">PROXY</li>
                 <li class="table-cell">DELETE</li>
                 {{end}}
             </ul>
@@ -92,6 +94,10 @@
                 </li>
 
                 {{if $me.Admin}}
+                    <li class="table-cell">
+                        {{.Proxy}}
+                        [<a href="/users/{{.UserName}}/proxy">change</a>]
+                    </li>
                     <li class="table-cell">
                         {{if ne .UserName "admin"}}
                             <a href="/users/{{.UserName}}/del">Del</a>

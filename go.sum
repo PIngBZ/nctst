@@ -2,6 +2,10 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/PIngBZ/socks5 v0.0.4 h1:eEtQXFz5n9/o3LT7lbEHWNVuCRZ9lhnqPUxjq/BndHI=
 github.com/PIngBZ/socks5 v0.0.4/go.mod h1:sgu2tCgbkS1N9XaT1xRmyp36F2hR2Ts6gIOCkD+PYgY=
+github.com/PIngBZ/socks5 v0.0.5 h1:clyYH/vzFnzIOoxkunGk+xit92tm+YDsZuWIbfmDCWI=
+github.com/PIngBZ/socks5 v0.0.5/go.mod h1:sgu2tCgbkS1N9XaT1xRmyp36F2hR2Ts6gIOCkD+PYgY=
+github.com/PIngBZ/socks5 v0.0.6 h1:4f0fZGsVQWZBgijZm9NBxb6uP8CgqGg9Og7vZCRIMHk=
+github.com/PIngBZ/socks5 v0.0.6/go.mod h1:sgu2tCgbkS1N9XaT1xRmyp36F2hR2Ts6gIOCkD+PYgY=
 github.com/ajg/form v1.5.1 h1:t9c7v8JUKu/XxOGBU0yjNpaMloxGEJhUkqFRq0ibGeU=
 github.com/ajg/form v1.5.1/go.mod h1:uL1WgH+h2mgNtvBq0339dVnzXdBETtL2LeUXaIv25UY=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=

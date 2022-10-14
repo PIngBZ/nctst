@@ -41,7 +41,7 @@ func init() {
 }
 
 func main() {
-	createAminUser()
+	CreateAminUser()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", config.Listen)
 	nctst.CheckError(err)
@@ -142,7 +142,9 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 		delete(clientUserNameIndex, cmd.UserName)
 	}
 
-	client := NewClient(cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
+	user, _ := UserMgr.GetUser(cmd.UserName)
+
+	client := NewClient(user, cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
 	nextClientID++
 	clients[cmd.ClientUUID] = client
 	clientUserNameIndex[cmd.UserName] = client
