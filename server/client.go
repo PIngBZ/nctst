@@ -21,6 +21,8 @@ type Client struct {
 	ID      uint
 	ConnKey string
 
+	proxyIPNet *net.IPNet
+
 	kcp            *nctst.Kcp
 	smux           *smux.Session
 	listener       net.Listener
@@ -42,6 +44,15 @@ func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum
 	k := md5.Sum([]byte(uuid))
 	h.ConnKey = hex.EncodeToString(k[:])
 	h.die = make(chan struct{})
+
+	if !h.User.Proxy && len(config.Localnetmask) > 0 {
+		_, ipNet, err := net.ParseCIDR(config.Localnetmask)
+		if err != nil {
+			log.Printf("NewClient ParseCIDR: %+v\n", err)
+		} else {
+			h.proxyIPNet = ipNet
+		}
+	}
 
 	h.kcp = nctst.NewKcp(id)
 	if compress {
@@ -174,12 +185,8 @@ func (t *Client) TransportUDP(server *socks5.UDPConn, request *socks5.Request) e
 }
 
 func (t *Client) CallbackAfterHandshake(srv *socks5.Server, req *socks5.Request) bool {
-	if !t.User.Proxy && len(config.Localnetmask) > 0 {
-		_, ipNet, err := net.ParseCIDR(config.Localnetmask)
-		if err != nil {
-			return true
-		}
-		return ipNet.Contains(req.Address.Addr)
+	if t.proxyIPNet != nil {
+		return t.proxyIPNet.Contains(req.Address.Addr)
 	}
 	return true
 }
