@@ -144,7 +144,7 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 
 	user, _ := UserMgr.GetUser(cmd.UserName)
 
-	client := NewClient(user, cmd.ClientUUID, nextClientID, cmd.Compress, cmd.Duplicate, cmd.TarType)
+	client := NewClient(user, cmd.ClientUUID, nextClientID, cmd.Compress)
 	nextClientID++
 	clients[cmd.ClientUUID] = client
 	clientUserNameIndex[cmd.UserName] = client

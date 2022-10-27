@@ -35,6 +35,10 @@
             <div class="table-column"></div>
             <div class="table-column"></div>
             {{end}}
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
+            <div class="table-column"></div>
         </div>
         <div class="table-header-group">
             <ul class="table-row">
@@ -56,6 +60,10 @@
                 <li class="table-cell">PROXY</li>
                 <li class="table-cell">DELETE</li>
                 {{end}}
+                <li class="table-cell">HourlyTraffic</li>
+                <li class="table-cell">DailyTraffic</li>
+                <li class="table-cell">WeeklyTraffic</li>
+                <li class="table-cell">MonthlyTraffic</li>
             </ul>
         </div>
         <div class="table-row-group">
@@ -104,6 +112,11 @@
                         {{end}}
                     </li>
                 {{end}}
+
+                <li class="table-cell">s:{{.TrafficHour.FormatSend}} r:{{.TrafficHour.FormatSReceive}}</li>
+                <li class="table-cell">s:{{.TrafficDay.FormatSend}} r:{{.TrafficDay.FormatSReceive}}</li>
+                <li class="table-cell">s:{{.TrafficWeek.FormatSend}} r:{{.TrafficWeek.FormatSReceive}}</li>
+                <li class="table-cell">s:{{.TrafficMonth.FormatSend}} r:{{.TrafficMonth.FormatSReceive}}</li>
             </ul>
             {{end}}
         </div>

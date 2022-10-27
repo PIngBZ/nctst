@@ -1,14 +1,41 @@
 {
-    "username": "haiping",
-    "password": "haiping",
+    "_Remark": "listen端口是提供服务端socks5协议端口，供支持socks5协议的客户端使用。maptargets是端口映射，不支持socks5的客户端可以直接map到远程目标端口",
+    "username": "test",
+    "password": "test",
     "listen": ":6101",
-    "serverIP": "127.0.0.1",
-    "serverPort": "8000",
-    "proxies": ["socks5:127.0.0.1:8889", "socks5:127.0.0.1:8899", "socks5:127.0.0.1:8889", "socks5:127.0.0.1:8899"],
-    "proxyfile": "proxylist.txt",
-    "connperproxy": 5,
-    "compress": false,
-    "tartype": "socks5",
-    "key": "123",
-    "duplicate": 2
+    "server": {
+        "host": "127.0.0.1",
+        "port": 8000
+    },
+    "proxies": [
+        {
+            "type": "socks5",
+            "host": "127.0.0.1",
+            "port": 8889,
+            "connnum": 3
+        }, {
+            "type": "socks5",
+            "host": "127.0.0.1",
+            "port": 8889,
+            "connnum": 3
+        }
+    ],
+    "proxyfile": {
+        "_Remark": "type: file/net(x.x.x.x:xxx)",
+        "type": "file",
+        "url": "proxylist.json",
+        "key": "",
+        "password": ""
+    },
+    "maptargets" : [
+        {
+            "host": "192.168.100.3",
+            "port": 22
+        }, {
+            "host": "192.168.100.5",
+            "port": 22
+        }
+    ],
+    "compress": true,
+    "key": "123"
 }

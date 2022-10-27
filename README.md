@@ -39,6 +39,8 @@ nctst是一个 TCP to TCP 点对点连接工具
 3. 其它梯子协议
 
 
+<img src="image.png" alt="validator1"/><img src="image.png" alt="validator2"/> <img src="image.png" alt="validator3"/> 
+
 ## Documentation
 
 

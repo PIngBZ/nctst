@@ -31,6 +31,11 @@ type ContextKey struct {
 	Key string
 }
 
+type Pair[T, U any] struct {
+	First  T
+	Second U
+}
+
 func CheckError(err error) {
 	if err != nil {
 		log.Printf("%+v\n", err)
@@ -67,18 +72,56 @@ func SmuxConfig() *smux.Config {
 var _copy_buf_pool = NewPool(1024 * 512)
 
 func Transfer(p1, p2 io.ReadWriteCloser) {
-	streamCopy := func(to, from io.ReadWriteCloser) {
+	TransferWithCounter(p1, p2, nil, nil)
+}
+
+func TransferWithCounter(p1, p2 io.ReadWriteCloser, wl1, wl2 *atomic.Int64) {
+	streamCopy := func(to, from io.ReadWriteCloser, l *atomic.Int64) {
 		defer to.Close()
 		defer from.Close()
 
 		buf := _copy_buf_pool.Get()
 		defer buf.Release()
 
-		io.CopyBuffer(to, from, buf.data)
+		CopyBufferWithCounter(to, from, buf.data, l)
 	}
 
-	go streamCopy(p1, p2)
-	streamCopy(p2, p1)
+	go streamCopy(p1, p2, wl1)
+	streamCopy(p2, p1, wl2)
+}
+
+func CopyBufferWithCounter(dst io.Writer, src io.Reader, buf []byte, wl *atomic.Int64) (written int64, err error) {
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[0:nr])
+			if nw < 0 || nr < nw {
+				nw = 0
+				if ew == nil {
+					ew = io.ErrShortWrite
+				}
+			}
+			written += int64(nw)
+			if wl != nil {
+				wl.Add(int64(nw))
+			}
+			if ew != nil {
+				err = ew
+				break
+			}
+			if nr != nw {
+				err = io.ErrShortWrite
+				break
+			}
+		}
+		if er != nil {
+			if er != io.EOF {
+				err = er
+			}
+			break
+		}
+	}
+	return written, err
 }
 
 func Min(x, y int) int {

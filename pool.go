@@ -86,21 +86,24 @@ func (h *BufItem) ReadNFromReader(src io.Reader, n int) (int, error) {
 }
 
 func (h *BufItem) Append(data *BufItem) {
+	if h.FreeSpace() < data.Size() {
+		log.Println("BufItem Append no enough space", data.Size(), h.FreeSpace())
+	}
 	h.AppendData(data.Data())
 }
 
 func (h *BufItem) AppendData(data []byte) *BufItem {
-	if len(data) > h.FreeSpace() {
+	if h.FreeSpace() < len(data) {
 		log.Println("BufItem AppendData no enough space", len(data), h.FreeSpace())
 	}
 	h.size += copy(h.data[h.start+h.size:], data)
 	return h
 }
 
-func (h *BufItem) AppendFromReader(src io.Reader) error {
-	n, err := src.Read(h.data[h.start+h.size:])
+func (h *BufItem) AppendFromReader(src io.Reader) (n int, err error) {
+	n, err = src.Read(h.data[h.start+h.size:])
 	h.size += n
-	return err
+	return
 }
 
 func (h *BufItem) AppendNFromReader(src io.Reader, n int) error {
@@ -113,6 +116,14 @@ func (h *BufItem) AppendNFromReader(src io.Reader, n int) error {
 	}
 	h.size += n
 	return nil
+}
+
+func (h *BufItem) Write(p []byte) (n int, err error) {
+	if h.FreeSpace() < len(p) {
+		return 0, io.ErrShortBuffer
+	}
+	h.AppendData(p)
+	return len(p), nil
 }
 
 func (h *BufItem) Copy() *BufItem {

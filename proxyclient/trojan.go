@@ -17,13 +17,10 @@ type TrojanClient struct {
 	headerWritten bool
 }
 
-func NewTrojanClient(serverName string, serverIP string, serverPort int, targetHost string, targetPort int) ProxyClient {
+func NewTrojanClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
 	h := &TrojanClient{}
-	h.ServerName = serverName
-	h.ServerIP = serverIP
-	h.ServerPort = serverPort
-	h.TargetHost = targetHost
-	h.TargetPort = targetPort
+	h.Server = server
+	h.Target = target
 	return h
 }
 
@@ -32,10 +29,10 @@ func (h *TrojanClient) Connect() error {
 
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
-		ServerName:         h.ServerName,
+		ServerName:         h.Server.LoginName,
 	}
 
-	conn, err := tls.Dial("tcp", fmt.Sprintf("%s:%d", h.ServerIP, h.ServerPort), conf)
+	conn, err := tls.Dial("tcp", h.Server.Address(), conf)
 	if err != nil {
 		return err
 	}
@@ -99,7 +96,7 @@ func (h *TrojanClient) writeWithHeader(payload []byte) (int, error) {
 
 func (h *TrojanClient) passwordHash() []byte {
 	hash := sha256.New224()
-	hash.Write([]byte(h.ServerName))
+	hash.Write([]byte(h.Server.Password))
 	val := hash.Sum(nil)
 	str := ""
 	for _, v := range val {
@@ -112,10 +109,10 @@ func (h *TrojanClient) writeMetadata(buf *bytes.Buffer) {
 	buf.WriteByte(byte(1))
 	buf.WriteByte(byte(3))
 
-	buf.WriteByte(byte(len(h.TargetHost)))
-	buf.Write([]byte(h.TargetHost))
+	buf.WriteByte(byte(len(h.Target.Host)))
+	buf.Write([]byte(h.Target.Host))
 
 	port := [2]byte{}
-	binary.BigEndian.PutUint16(port[:], uint16(h.TargetPort))
+	binary.BigEndian.PutUint16(port[:], uint16(h.Target.Port))
 	buf.Write(port[:])
 }

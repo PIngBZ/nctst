@@ -4,7 +4,7 @@ import (
 	"log"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/proxy/proxyclient"
+	"github.com/PIngBZ/nctst/proxyclient"
 )
 
 type Proxy struct {
@@ -12,13 +12,13 @@ type Proxy struct {
 	connectors map[uint]*ProxyConnector
 }
 
-func NewProxy(id uint, proxyIP string, tunnel *nctst.OuterTunnel) *Proxy {
+func NewProxy(id uint, proxy *proxyclient.ProxyInfo, tunnel *nctst.OuterTunnel) *Proxy {
 	h := &Proxy{}
 	h.ID = id
 
 	h.connectors = make(map[uint]*ProxyConnector)
-	for i := 0; i < config.Connperproxy; i++ {
-		client := proxyclient.NewProxyClient(proxyIP, config.ServerIP, config.ServerPortI)
+	for i := 0; i < proxy.ConnNum; i++ {
+		client := proxyclient.NewProxyClient(proxy, config.Server)
 		if client == nil {
 			return nil
 		}

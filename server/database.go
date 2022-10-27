@@ -21,6 +21,14 @@ func init() {
 	nctst.CheckError(err)
 	DB = db
 
+	createConfigTable(db)
+	createUserTable(db)
+	createDataCountTable(db)
+
+	upgradeDatabase()
+}
+
+func createConfigTable(db *sql.DB) {
 	cmd := `
 		CREATE TABLE IF NOT EXISTS config (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,10 +36,12 @@ func init() {
 			value VARCHAR(64),
 		); 
 	`
-	_, err = db.Exec(cmd)
+	_, err := db.Exec(cmd)
 	nctst.CheckError(err)
+}
 
-	cmd = `
+func createUserTable(db *sql.DB) {
+	cmd := `
 		CREATE TABLE IF NOT EXISTS userinfo (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			username VARCHAR(64) UNIQUE,
@@ -45,10 +55,22 @@ func init() {
 			proxy INTEGER DEFAULT 0
 		); 
 	`
-	_, err = db.Exec(cmd)
+	_, err := db.Exec(cmd)
 	nctst.CheckError(err)
+}
 
-	upgradeDatabase()
+func createDataCountTable(db *sql.DB) {
+	cmd := `
+		CREATE TABLE IF NOT EXISTS datacount (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			username VARCHAR(64) UNIQUE,
+			send INTEGER DEFAULT 0,
+			receive INTEGER DEFAULT 0,
+			savetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		); 
+	`
+	_, err := db.Exec(cmd)
+	nctst.CheckError(err)
 }
 
 func CreateAminUser() {

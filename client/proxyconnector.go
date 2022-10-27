@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/proxy/proxyclient"
+	"github.com/PIngBZ/nctst/proxyclient"
 )
 
 var (

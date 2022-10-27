@@ -3,7 +3,7 @@ module github.com/PIngBZ/nctst
 go 1.18
 
 require (
-	github.com/PIngBZ/socks5 v0.0.6
+	github.com/PIngBZ/socks5 v0.0.8
 	github.com/go-chi/chi v1.5.4
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/render v1.0.2
@@ -17,6 +17,7 @@ require (
 
 require (
 	github.com/ajg/form v1.5.1 // indirect
+	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.14 // indirect
 	github.com/klauspost/reedsolomon v1.10.0 // indirect
 	github.com/templexxx/cpufeat v0.0.0-20180724012125-cef66df7f161 // indirect

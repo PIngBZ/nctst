@@ -9,11 +9,10 @@ import (
 
 type Config struct {
 	Listen        string `json:"listen"`
-	Target        string `json:"target"`
 	Key           string `json:"key"`
+	Localnetmask  string `json:"localnetmask"`
 	AdminListen   string `json:"adminlisten"`
 	AdminPassword string `json:"adminpwd"`
-	Localnetmask  string `json:"localnetmask"`
 	Test          bool   `json:"test"`
 }
 

@@ -2,9 +2,9 @@ package proxyclient
 
 import (
 	"io"
-	"strconv"
 	"time"
 
+	"github.com/PIngBZ/nctst"
 	"github.com/PIngBZ/socks5"
 )
 
@@ -12,14 +12,10 @@ type Socks5Client struct {
 	proxyClient
 }
 
-func NewSocks5Client(serverName string, serverIP string, serverPort int, targetHost string, targetPort int) ProxyClient {
+func NewSocks5Client(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
 	h := &Socks5Client{}
-	h.ServerName = serverName
-	h.ServerIP = serverIP
-	h.ServerPort = serverPort
-	h.TargetHost = targetHost
-	h.TargetPort = targetPort
-
+	h.Server = server
+	h.Target = target
 	return h
 }
 
@@ -29,16 +25,22 @@ func (h *Socks5Client) Connect() error {
 		h.Conn = nil
 	}
 
-	client := socks5.Client{
-		ProxyAddr:        h.ServerIP + ":" + strconv.Itoa(h.ServerPort),
-		DialTimeout:      time.Second * 5,
-		HandshakeTimeout: time.Second * 5,
-		Auth: map[socks5.METHOD]socks5.Authenticator{
-			socks5.NO_AUTHENTICATION_REQUIRED: &socks5.NoAuth{},
-		},
+	auth := map[socks5.METHOD]socks5.Authenticator{
+		socks5.NO_AUTHENTICATION_REQUIRED: socks5.NoAuth{},
 	}
 
-	conn, err := client.Connect(socks5.Version5, h.TargetHost+":"+strconv.Itoa(h.TargetPort))
+	if len(h.Server.LoginName) > 0 {
+		auth[socks5.USERNAME_PASSWORD] = &socks5.UserPasswd{Username: h.Server.LoginName, Password: h.Server.Password}
+	}
+
+	client := socks5.Client{
+		ProxyAddr:        h.Server.Address(),
+		DialTimeout:      time.Second * 5,
+		HandshakeTimeout: time.Second * 5,
+		Auth:             auth,
+	}
+
+	conn, err := client.Connect(socks5.Version5, h.Target.Address())
 	if err != nil {
 		return err
 	}

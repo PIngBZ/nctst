@@ -32,11 +32,14 @@ type Client struct {
 	tunnelsLocker  sync.Mutex
 	tunnelsListVer uint32
 
+	receiveCounter atomic.Int64
+	sendCounter    atomic.Int64
+
 	die     chan struct{}
 	dieOnce sync.Once
 }
 
-func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum int, tarType string) *Client {
+func NewClient(user *UserInfo, uuid string, id uint, compress bool) *Client {
 	h := &Client{}
 	h.User = user
 	h.UUID = uuid
@@ -44,6 +47,8 @@ func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum
 	k := md5.Sum([]byte(uuid))
 	h.ConnKey = hex.EncodeToString(k[:])
 	h.die = make(chan struct{})
+
+	go h.saveCountLoop()
 
 	if !h.User.Proxy && len(config.Localnetmask) > 0 {
 		_, ipNet, err := net.ParseCIDR(config.Localnetmask)
@@ -64,7 +69,7 @@ func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum
 
 	h.tunnels = make(map[uint]*nctst.OuterTunnel)
 	h.tunnelsListVer = 100
-	h.duplicater = nctst.NewDuplicater(duplicateNum, h.kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) {
+	h.duplicater = nctst.NewDuplicater(h.kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) {
 		if v == atomic.LoadUint32(&h.tunnelsListVer) {
 			return v, nil
 		}
@@ -79,13 +84,9 @@ func NewClient(user *UserInfo, uuid string, id uint, compress bool, duplicateNum
 		return atomic.LoadUint32(&h.tunnelsListVer), tunnels
 	})
 
-	if tarType == "socks5" {
-		go h.listenAndServeSocks5()
-	} else {
-		go h.listenAndServeTCP()
-	}
+	go h.listenAndServeSocks5()
 
-	log.Printf("Client.New %s %d %d %s\n", uuid, id, duplicateNum, tarType)
+	log.Printf("Client.New %s %d\n", uuid, id)
 	return h
 }
 
@@ -117,6 +118,8 @@ func (h *Client) Close() {
 
 	h.tunnelsLocker.Unlock()
 
+	h.saveCount()
+
 	log.Printf("Client.Close %d %s\n", h.ID, h.UUID)
 }
 
@@ -131,33 +134,6 @@ func (h *Client) AddConn(conn *net.TCPConn, tunnelID uint, connID uint) {
 	h.tunnelsLocker.Unlock()
 
 	tunnel.AddConn(conn, connID)
-}
-
-func (h *Client) listenAndServeTCP() {
-	for {
-		stream, err := h.listener.Accept()
-		if err != nil {
-			log.Printf("accept stream: %d %+v\n", h.ID, err)
-			continue
-		}
-
-		log.Printf("AcceptStream %d %d\n", h.ID, stream.(*smux.Stream).ID())
-		go h.connectTarget(stream)
-	}
-}
-
-func (h *Client) connectTarget(conn net.Conn) {
-	target, err := net.DialTimeout("tcp", config.Target, time.Second*3)
-	if err != nil {
-		log.Printf("connectTarget: %d %+v\n", h.ID, err)
-		conn.Close()
-		return
-	}
-
-	target.SetDeadline(time.Time{})
-	conn.SetDeadline(time.Time{})
-
-	go nctst.Transfer(conn, target)
 }
 
 func (h *Client) listenAndServeSocks5() {
@@ -175,18 +151,37 @@ func (h *Client) listenAndServeSocks5() {
 	h.socks5.Serve(h.listener)
 }
 
-func (t *Client) TransportStream(client io.ReadWriteCloser, remote io.ReadWriteCloser) <-chan error {
-	nctst.Transfer(client, remote)
+func (h *Client) TransportStream(client io.ReadWriteCloser, remote io.ReadWriteCloser) <-chan error {
+	nctst.TransferWithCounter(client, remote, &h.receiveCounter, &h.sendCounter)
 	return nil
 }
 
-func (t *Client) TransportUDP(server *socks5.UDPConn, request *socks5.Request) error {
+func (h *Client) TransportUDP(server *socks5.UDPConn, request *socks5.Request) error {
 	return nil
 }
 
-func (t *Client) CallbackAfterHandshake(srv *socks5.Server, req *socks5.Request) bool {
-	if t.proxyIPNet != nil {
-		return t.proxyIPNet.Contains(req.Address.Addr)
+func (h *Client) CallbackAfterHandshake(srv *socks5.Server, req *socks5.Request) bool {
+	if h.proxyIPNet != nil {
+		return h.proxyIPNet.Contains(req.Address.Addr)
 	}
 	return true
+}
+
+func (h *Client) saveCountLoop() {
+	for {
+		select {
+		case <-h.die:
+			return
+		case <-time.Tick(time.Hour):
+			h.saveCount()
+		}
+	}
+}
+
+func (h *Client) saveCount() {
+	send := h.sendCounter.Swap(0)
+	receive := h.receiveCounter.Swap(0)
+	if send > 0 || receive > 0 {
+		UserMgr.SaveCount(h.User, send, receive)
+	}
 }

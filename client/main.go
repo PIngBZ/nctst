@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/proxy/proxylist"
+	"github.com/PIngBZ/nctst/proxyclient"
 	"github.com/google/uuid"
 	"github.com/xtaci/smux"
 )
@@ -67,7 +67,7 @@ func main() {
 	WaittingLogin()
 
 	kcp = nctst.NewKcp(ClientID)
-	duplicater = nctst.NewDuplicater(config.Duplicate, kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 100, tunnels })
+	duplicater = nctst.NewDuplicater(kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 100, tunnels })
 
 	var smuxClient *smux.Session
 	if config.Compress {
@@ -79,48 +79,58 @@ func main() {
 
 	startUpstreamProxies()
 
+	startMapTargetsLoop(smuxClient, config.MapTargets)
+
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
-			log.Printf("AcceptTCP: %+v\n", err)
+			log.Printf("main AcceptTCP: %+v\n", err)
 			continue
 		}
 
-		log.Printf("AcceptTCP %s\n", conn.RemoteAddr().String())
+		log.Printf("main AcceptTCP %s\n", conn.RemoteAddr().String())
 
-		stream, err := smuxClient.OpenStream()
-		if err != nil {
-			conn.Close()
-			log.Printf("AcceptTCP: %+v\n", err)
-			continue
-		}
-
-		conn.SetDeadline(time.Time{})
-		stream.SetDeadline(time.Time{})
-
-		log.Printf("AcceptTCP transfer %s\n", conn.RemoteAddr().String())
-		go nctst.Transfer(conn, stream)
+		go doTransfer(conn, smuxClient)
 	}
 }
 
+func doTransfer(conn *net.TCPConn, smuxClient *smux.Session) {
+	stream, err := smuxClient.OpenStream()
+	if err != nil {
+		conn.Close()
+		log.Printf("main doTransfer OpenStream: %+v\n", err)
+		return
+	}
+
+	conn.SetDeadline(time.Time{})
+	stream.SetDeadline(time.Time{})
+
+	log.Printf("main doTransfer Transfer %s\n", conn.RemoteAddr().String())
+	go nctst.Transfer(conn, stream)
+}
+
 func startUpstreamProxies() {
-	var proxyList []string
+	var proxyList []*proxyclient.ProxyInfo
 	if len(config.Proxies) != 0 {
 		proxyList = config.Proxies
-	} else if len(config.ProxyFile) > 0 {
-		proxyList = proxylist.GetProxyList(config.ProxyFile)
-		if len(proxyList) == 0 {
-			nctst.CheckError(errors.New("can not get proxy server list"))
-		}
-	} else {
+		log.Printf("found %d items from config.Proxies\n", len(proxyList))
+	}
+
+	if config.ProxyFile != nil {
+		serverList := GetProxyList(config.ProxyFile)
+		proxyList = append(proxyList, serverList...)
+		log.Printf("found %d items from server %s\n", len(serverList), config.ProxyFile)
+	}
+
+	if len(proxyList) == 0 {
 		nctst.CheckError(errors.New("no proxy server"))
 	}
 
 	proxies = make([]*Proxy, len(proxyList))
 
-	for i, proxyIP := range config.Proxies {
+	for i, p := range config.Proxies {
 		tunnel := nctst.NewOuterTunnel(config.Key, uint(i), ClientID, kcp.InputChan, duplicater.Output)
-		proxies[i] = NewProxy(uint(i), proxyIP, tunnel)
+		proxies[i] = NewProxy(uint(i), p, tunnel)
 		tunnels = append(tunnels, tunnel)
 	}
 }

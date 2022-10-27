@@ -134,7 +134,7 @@ func (h *OuterTunnel) transferLoop() {
 
 func (h *OuterTunnel) daemon() {
 	for {
-		ticker := time.NewTicker(time.Second * time.Duration(rand.Intn(5)+5))
+		ticker := time.NewTicker(time.Second * time.Duration(rand.Intn(15)+15))
 		select {
 		case <-h.Die:
 			return

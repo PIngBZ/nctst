@@ -229,9 +229,7 @@ type CommandLogin struct {
 	ClientUUID string
 	UserName   string
 	PassWord   string
-	Duplicate  int
 	Compress   bool
-	TarType    string
 	Key        string
 }
 

@@ -1,0 +1,28 @@
+{
+    "selectpergroup": 2,
+    "connperserver": 3,
+    "proxygroups": [
+        {
+            "name": "",
+            "proxylist": [
+                {
+                    "type": "socks5",
+                    "host": "127.0.0.1",
+                    "port": 8889,
+                    "connnum": 3
+                }
+            ]
+        }, 
+        {
+            "name": "",
+            "proxylist": [
+                {
+                    "type": "socks5",
+                    "host": "127.0.0.1",
+                    "port": 8889,
+                    "connnum": 3
+                }
+            ]
+        }
+    ]
+}

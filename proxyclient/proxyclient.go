@@ -5,55 +5,56 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/PIngBZ/nctst"
 )
 
+type ProxyInfo struct {
+	nctst.AddrInfo
+	Type      string `json:"type"`
+	LoginName string `json:"loginname"`
+	Password  string `json:"password"`
+	ConnNum   int    `json:"connnum"`
+}
+
+type ProxyListGroup struct {
+	Name      string       `json:"name"`
+	ProxyList []*ProxyInfo `json:"proxylist"`
+}
+
+type ProxyFileInfo struct {
+	SelectPerGroup int               `json:"selectpergroup"`
+	ConnPerServer  int               `json:"connperserver"`
+	ProxyGroups    []*ProxyListGroup `json:"proxygroups"`
+}
+
 type ProxyClient interface {
 	net.Conn
 
 	Connect() error
-	Ping(finished func(ProxyClient, uint, error))
-	LastPing() uint
+	Ping(finished func(ProxyClient, uint32, error)) bool
+	LastPing() uint32
 }
 
-func NewProxyClient(addr string, serverIP string, serverPort int) ProxyClient {
-	if addr[:6] == "socks5" {
-		host, port, err := nctst.SplitHostPort(addr[7:])
-		if err != nil {
-			log.Printf("NewProxyServer SplitHostPort %+v\n", err)
-			return nil
-		}
-		return NewSocks5Client(addr[7:], host, port, serverIP, serverPort)
-	} else if addr[:6] == "trojan" {
-		s := addr[7:]
-		sp := strings.Split(s, "@")
-
-		host, port, err := nctst.SplitHostPort(sp[1])
-		if err != nil {
-			log.Printf("NewProxyServer SplitHostPort %+v\n", err)
-			return nil
-		}
-
-		return NewTrojanClient(sp[0], host, port, serverIP, serverPort)
+func NewProxyClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
+	if server.Type == "socks5" {
+		return NewSocks5Client(server, target)
+	} else if server.Type == "trojan" {
+		return NewTrojanClient(server, target)
 	} else {
-		log.Println("unknown proxy type: " + addr)
+		log.Println("unknown proxy type: " + server.Type)
 		return nil
 	}
 }
 
 type proxyClient struct {
-	ServerName string
-	ServerIP   string
-	ServerPort int
+	Server *ProxyInfo
 
-	TargetHost string
-	TargetPort int
+	Target *nctst.AddrInfo
 
 	Conn     net.Conn
-	TestPing uint
+	TestPing uint32
 }
 
 func (h *proxyClient) LocalAddr() net.Addr {
@@ -88,24 +89,25 @@ func (h *proxyClient) SetWriteDeadline(t time.Time) error {
 	return h.Conn.SetWriteDeadline(t)
 }
 
-func (h *proxyClient) LastPing() uint {
+func (h *proxyClient) LastPing() uint32 {
 	return h.TestPing
 }
 
-func (hh *proxyClient) Ping(finished func(ProxyClient, uint, error)) {
+func (hh *proxyClient) Ping(finished func(ProxyClient, uint32, error)) bool {
 	var i interface{} = hh
 	var h = i.(ProxyClient)
+	hh.TestPing = 100000
 
 	defer h.Close()
 
 	if err := h.Connect(); err != nil {
 		finished(h, 0, err)
-		return
+		return false
 	}
 
 	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_idle, Item: &nctst.CommandIdle{}}); err != nil {
 		finished(h, 0, err)
-		return
+		return false
 	}
 
 	time.Sleep(time.Millisecond * 500)
@@ -113,31 +115,43 @@ func (hh *proxyClient) Ping(finished func(ProxyClient, uint, error)) {
 	cmd := &nctst.CommandTestPing{}
 	cmd.SendTime = time.Now().UnixNano() / 1e6
 	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
-		finished(h, 0, err)
-		return
+		if finished != nil {
+			finished(h, 0, err)
+		}
+		return false
 	}
 
 	buf, err := nctst.ReadLBuf(h)
 	if err != nil {
-		finished(h, 0, err)
-		return
+		if finished != nil {
+			finished(h, 0, err)
+		}
+		return false
 	}
 
 	command, err := nctst.ReadCommand(buf)
 	if err != nil {
-		finished(h, 0, err)
-		return
+		if finished != nil {
+			finished(h, 0, err)
+		}
+		return false
 	}
 
 	if command.Type != nctst.Cmd_testping {
-		finished(h, 0, errors.New("testping ret type error"))
-		return
+		if finished != nil {
+			finished(h, 0, errors.New("testping ret type error"))
+		}
+		return false
 	}
 
 	ret := command.Item.(*nctst.CommandTestPing)
 
-	ping := uint(time.Now().UnixNano()/1e6 - ret.SendTime)
+	ping := uint32(time.Now().UnixNano()/1e6 - ret.SendTime)
 
 	hh.TestPing = ping
-	finished(h, ping, nil)
+	if finished != nil {
+		finished(h, ping, nil)
+	}
+
+	return true
 }

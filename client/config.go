@@ -2,25 +2,22 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
-	"strconv"
+
+	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/nctst/proxyclient"
 )
 
 type Config struct {
-	UserName     string `json:"username"`
-	PassWord     string `json:"password"`
-	Listen       string `json:"listen"`
-	ServerIP     string `json:"serverIP"`
-	ServerPort   string `json:"serverPort"`
-	ServerPortI  int
-	Proxies      []string `json:"proxies"`
-	ProxyFile    string   `json:"proxyfile"`
-	Connperproxy int      `json:"connperproxy"`
-	Compress     bool     `json:"compress"`
-	TarType      string   `json:"tartype"`
-	Key          string   `json:"key"`
-	Duplicate    int      `json:"duplicate"`
+	UserName   string                   `json:"username"`
+	PassWord   string                   `json:"password"`
+	Listen     string                   `json:"listen"`
+	Server     *nctst.AddrInfo          `json:"server"`
+	Proxies    []*proxyclient.ProxyInfo `json:"proxies"`
+	ProxyFile  *ProxyFileInfo           `json:"proxyfile"`
+	MapTargets []*nctst.AddrInfo        `json:"maptargets"`
+	Compress   bool                     `json:"compress"`
+	Key        string                   `json:"key"`
 }
 
 func parseConfig(configFile string) (*Config, error) {
@@ -36,17 +33,10 @@ func parseConfig(configFile string) (*Config, error) {
 		return nil, err
 	}
 
-	cfg.ServerPortI, _ = strconv.Atoi(cfg.ServerPort)
-
-	if cfg.Connperproxy == 0 {
-		cfg.Connperproxy = 1
-	}
-	if cfg.Duplicate == 0 {
-		cfg.Duplicate = 1
-	}
-
-	if cfg.TarType != "socks5" && cfg.TarType != "tcp" {
-		return nil, fmt.Errorf("TarType can only be socks5/tcp")
+	for _, proxy := range cfg.Proxies {
+		if proxy.ConnNum == 0 {
+			proxy.ConnNum = 1
+		}
 	}
 
 	return cfg, nil

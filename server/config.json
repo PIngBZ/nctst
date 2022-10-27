@@ -1,9 +1,8 @@
 {
     "listen": ":8000",
-    "target": "192.168.1.10:6101",
     "key": "123",
+    "localnetmask": "127.0.0.1/24",
     "adminlisten": ":9000",
     "adminpwd": "admin",
-    "localnetmask": "192.168.100/24",
-    "test": false
+    "test": true
 }

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/proxy/proxyclient"
+	"github.com/PIngBZ/nctst/proxyclient"
 )
 
 var (
@@ -19,8 +19,8 @@ func WaittingLogin() {
 	log.Println("login ...")
 
 	for {
-		for _, proxyIP := range config.Proxies {
-			client := proxyclient.NewProxyClient(proxyIP, config.ServerIP, config.ServerPortI)
+		for _, p := range config.Proxies {
+			client := proxyclient.NewProxyClient(p, config.Server)
 			if client == nil {
 				continue
 			}
@@ -29,11 +29,11 @@ func WaittingLogin() {
 				log.Printf("login success %d\n", ClientID)
 				return
 			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
-				log.Printf("try login failed %s\n", proxyIP)
+				log.Printf("try login failed %s\n", p.Host)
 				nctst.CheckError(err)
 				return
 			} else {
-				log.Printf("try login failed %s %+v\n", proxyIP, err)
+				log.Printf("try login failed %s %+v\n", p.Host, err)
 			}
 		}
 		log.Println("wait 5s to retry ...")
@@ -72,9 +72,7 @@ func sendLoginCommand(conn io.Writer) error {
 	cmd.UserName = config.UserName
 	cmd.PassWord = nctst.HashPassword(config.UserName, config.PassWord)
 	cmd.ClientUUID = UUID
-	cmd.Duplicate = config.Duplicate
 	cmd.Compress = config.Compress
-	cmd.TarType = config.TarType
 	cmd.Key = config.Key
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }
