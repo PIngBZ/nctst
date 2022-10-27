@@ -26,7 +26,7 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 5. 多用户
 
-6. 手机App生成验证码登录(iOS客户端，Flutter客户端)
+6. 手机App生成验证码登录(swift iOS客户端，Flutter 安卓/iOS客户端)
 
 <table><tbody><tr>
 <td><img src="validator1.png" alt="App screenshot" height="400"/></td>
