@@ -28,6 +28,12 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 6. 手机App生成验证码登录(iOS客户端，Flutter客户端)
 
+<table><tbody><tr>
+<td><img src="validator1.png" alt="App screenshot" height="400"/></td>
+<td><img src="validator2.png" alt="App screenshot" height="400"/></td>
+<td><img src="validator3.png" alt="App screenshot" height="400"/></td>
+</tr></tbody></table>
+
 
 
 <h3>后续计划支持：</h3>
@@ -38,12 +44,6 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 3. 其它梯子协议
 
-
-<table><tbody><tr>
-<td><img src="validator1.png" alt="App screenshot" height="300"/></td>
-<td><img src="validator2.png" alt="App screenshot" height="300"/></td>
-<td><img src="validator3.png" alt="App screenshot" height="300"/></td>
-</tr></tbody></table>
 
 ## Documentation
 
