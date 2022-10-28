@@ -6,7 +6,12 @@
         .table{display:table;border-collapse:collapse;border:1px solid #ccc;}  
         .table-caption{display:table-caption;margin:0;padding:0;font-size:16px;}  
         .table-column-group{display:table-column-group;}  
-        .table-column{display:table-column;width:130px;}  
+        .table-columnw1{display:table-column;width:30px;}  
+        .table-columnw2{display:table-column;width:50px;}  
+        .table-columnw3{display:table-column;width:90px;}  
+        .table-columnw4{display:table-column;width:120px;}  
+        .table-columnw5{display:table-column;width:150px;}  
+        .table-columnw6{display:table-column;width:200px;}  
         .table-row-group{display:table-row-group;}  
         .table-row{display:table-row;}  
         .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
@@ -22,43 +27,43 @@
     {{end}}
     <div class="table">
         <div class="table-column-group">
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
+            <div class="table-columnw1"></div>
+            <div class="table-columnw3"></div>
+            <div class="table-columnw4"></div>
+            <div class="table-columnw4"></div>
+            <div class="table-columnw4"></div>
+            <div class="table-columnw3"></div>
             {{if .Me.Admin}}
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
+            <div class="table-columnw3"></div>
+            <div class="table-columnw3"></div>
+            <div class="table-columnw4"></div>
+            <div class="table-columnw3"></div>
+            <div class="table-columnw1"></div>
             {{end}}
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
-            <div class="table-column"></div>
+            <div class="table-columnw6"></div>
+            <div class="table-columnw6"></div>
+            <div class="table-columnw6"></div>
+            <div class="table-columnw6"></div>
         </div>
         <div class="table-header-group">
             <ul class="table-row">
                 <li class="table-cell">ID</li>
                 <li class="table-cell">USER</li>
                 <li class="table-cell">NAME</li>
-                <li class="table-cell">LASTUSE</li>
+                <li class="table-cell">LOGIN</li>
                 <li class="table-cell">CREATE</li>
 
                 {{if .Me.Admin}}
                 <li class="table-cell">ADMIN</li>
                 <li class="table-cell">CODE</li>
-                <li class="table-cell">SECONDS</li>
+                <li class="table-cell">SEC</li>
                 {{end}}
                 
-                <li class="table-cell">PASSWORD</li>
+                <li class="table-cell">PWD</li>
 
                 {{if .Me.Admin}}
                 <li class="table-cell">PROXY</li>
-                <li class="table-cell">DELETE</li>
+                <li class="table-cell">DEL</li>
                 {{end}}
                 <li class="table-cell">HourlyTraffic</li>
                 <li class="table-cell">DailyTraffic</li>
@@ -104,7 +109,9 @@
                 {{if $me.Admin}}
                     <li class="table-cell">
                         {{.Proxy}}
+                        {{if ne .UserName "admin"}}
                         [<a href="/users/{{.UserName}}/proxy">change</a>]
+                        {{end}}
                     </li>
                     <li class="table-cell">
                         {{if ne .UserName "admin"}}
@@ -113,10 +120,10 @@
                     </li>
                 {{end}}
 
-                <li class="table-cell">s:{{.TrafficHour.FormatSend}} r:{{.TrafficHour.FormatSReceive}}</li>
-                <li class="table-cell">s:{{.TrafficDay.FormatSend}} r:{{.TrafficDay.FormatSReceive}}</li>
-                <li class="table-cell">s:{{.TrafficWeek.FormatSend}} r:{{.TrafficWeek.FormatSReceive}}</li>
-                <li class="table-cell">s:{{.TrafficMonth.FormatSend}} r:{{.TrafficMonth.FormatSReceive}}</li>
+                <li class="table-cell">s: {{.TrafficHour.FormatSend}} r: {{.TrafficHour.FormatSReceive}}</li>
+                <li class="table-cell">s: {{.TrafficDay.FormatSend}} r: {{.TrafficDay.FormatSReceive}}</li>
+                <li class="table-cell">s: {{.TrafficWeek.FormatSend}} r: {{.TrafficWeek.FormatSReceive}}</li>
+                <li class="table-cell">s: {{.TrafficMonth.FormatSend}} r: {{.TrafficMonth.FormatSReceive}}</li>
             </ul>
             {{end}}
         </div>

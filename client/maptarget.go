@@ -14,8 +14,8 @@ import (
 
 func startMapTargetsLoop(smuxClient *smux.Session, targets []*nctst.AddrInfo) {
 	port := 2000 + rand.Intn(3000)
-	log.Printf("++++++++++Preparing map local port to remote address++++++++++\n\n")
-	defer log.Println("\n----------end----------")
+	log.Printf("\n++++++++++Preparing map local port to remote address++++++++++\n\n")
+	defer log.Println("\n\n----------map local port end----------")
 
 	for _, target := range targets {
 		for {

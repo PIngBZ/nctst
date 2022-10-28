@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"sync"
 )
 
@@ -123,6 +124,11 @@ func (h *CommandManager) publishCommand(cmd *Command) {
 }
 
 func SendCommand(conn io.Writer, command *Command) error {
+	if command.Type == Cmd_idle {
+		randBytes := make([]byte, 256+rand.Intn(256))
+		rand.Read(randBytes)
+		command.Item.(*CommandIdle).Payload = randBytes
+	}
 	js, err := ToJson(command.Item)
 
 	if err != nil {
@@ -217,7 +223,7 @@ type Command struct {
 }
 
 type CommandIdle struct {
-	Payload string
+	Payload []byte
 }
 
 type CommandTestPing struct {

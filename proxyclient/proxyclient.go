@@ -33,7 +33,7 @@ type ProxyClient interface {
 	net.Conn
 
 	Connect() error
-	Ping(finished func(ProxyClient, uint32, error)) bool
+	Ping(self ProxyClient, finished func(ProxyClient, uint32, error)) bool
 	LastPing() uint32
 }
 
@@ -93,9 +93,8 @@ func (h *proxyClient) LastPing() uint32 {
 	return h.TestPing
 }
 
-func (hh *proxyClient) Ping(finished func(ProxyClient, uint32, error)) bool {
-	var i interface{} = hh
-	var h = i.(ProxyClient)
+func (hh *proxyClient) Ping(self ProxyClient, finished func(ProxyClient, uint32, error)) bool {
+	var h = self
 	hh.TestPing = 100000
 
 	defer h.Close()
@@ -105,14 +104,25 @@ func (hh *proxyClient) Ping(finished func(ProxyClient, uint32, error)) bool {
 		return false
 	}
 
-	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_idle, Item: &nctst.CommandIdle{}}); err != nil {
+	if err := nctst.WriteUInt(h, nctst.NEW_CONNECTION_KEY); err != nil {
 		finished(h, 0, err)
 		return false
 	}
 
-	time.Sleep(time.Millisecond * 500)
-
 	cmd := &nctst.CommandTestPing{}
+	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
+		finished(h, 0, err)
+		return false
+	}
+
+	_, err := nctst.ReadLBuf(h)
+	if err != nil {
+		if finished != nil {
+			finished(h, 0, err)
+		}
+		return false
+	}
+
 	cmd.SendTime = time.Now().UnixNano() / 1e6
 	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
 		if finished != nil {

@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/PIngBZ/nctst"
 
@@ -33,7 +32,7 @@ func createConfigTable(db *sql.DB) {
 		CREATE TABLE IF NOT EXISTS config (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			key VARCHAR(64) UNIQUE,
-			value VARCHAR(64),
+			value VARCHAR(64)
 		); 
 	`
 	_, err := db.Exec(cmd)
@@ -51,8 +50,7 @@ func createUserTable(db *sql.DB) {
 			session VARCHAR(64) DEFAULT "",
 			lasttime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			createtime TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			status INTEGER DEFAULT 0,
-			proxy INTEGER DEFAULT 0
+			status INTEGER DEFAULT 0
 		); 
 	`
 	_, err := db.Exec(cmd)
@@ -63,7 +61,7 @@ func createDataCountTable(db *sql.DB) {
 	cmd := `
 		CREATE TABLE IF NOT EXISTS datacount (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			username VARCHAR(64) UNIQUE,
+			username VARCHAR(64),
 			send INTEGER DEFAULT 0,
 			receive INTEGER DEFAULT 0,
 			savetime TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -73,19 +71,10 @@ func createDataCountTable(db *sql.DB) {
 	nctst.CheckError(err)
 }
 
-func CreateAminUser() {
-	time.Sleep(time.Second)
-	cmd := "insert into userinfo(username,realname,password,admin) values(?,?,?,?)"
-	DB.Exec(cmd, "admin", "Administrator", nctst.HashPassword("admin", config.AdminPassword), 1)
-
-	cmd = "upadte userinfo set password=? where username=admin"
-	DB.Exec(cmd, nctst.HashPassword("admin", config.AdminPassword))
-}
-
 func upgradeDatabase() {
 	ver, _ := GetConfigIntFromDB("dbversion")
 
-	if ver < CurrentDBVersion {
+	if ver <= CurrentDBVersion {
 		switch {
 		case ver < 100:
 			upgrade100()

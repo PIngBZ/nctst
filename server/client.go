@@ -118,7 +118,7 @@ func (h *Client) Close() {
 
 	h.tunnelsLocker.Unlock()
 
-	h.saveCount()
+	h.saveCount(true)
 
 	log.Printf("Client.Close %d %s\n", h.ID, h.UUID)
 }
@@ -173,12 +173,15 @@ func (h *Client) saveCountLoop() {
 		case <-h.die:
 			return
 		case <-time.Tick(time.Hour):
-			h.saveCount()
+			h.saveCount(false)
 		}
 	}
 }
 
-func (h *Client) saveCount() {
+func (h *Client) saveCount(force bool) {
+	if !force && h.sendCounter.Load() < 1024*1024 && h.receiveCounter.Load() < 1024*1024 {
+		return
+	}
 	send := h.sendCounter.Swap(0)
 	receive := h.receiveCounter.Swap(0)
 	if send > 0 || receive > 0 {

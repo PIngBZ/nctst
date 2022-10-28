@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"os"
@@ -34,6 +35,9 @@ func parseConfig(configFile string) (*Config, error) {
 
 func GetConfigFromDB(key string) (value string, err error) {
 	if err = DB.QueryRow("select value from config where key=?", key).Scan(&value); err != nil {
+		if err == sql.ErrNoRows {
+			return
+		}
 		log.Printf("configFromDB key=%s, %+v\n", key, err)
 	}
 	return

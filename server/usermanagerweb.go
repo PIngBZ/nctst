@@ -152,15 +152,15 @@ type ListUserRenderData struct {
 }
 
 func (h *UserManager) getDataCounts(t int) (map[string]nctst.Pair[uint64, uint64], error) {
-	w := "date_format(savetime,'%Y%m-%d-%H')=date_format(now(),'%Y-%m-%d-%H')" // hour
+	w := "%Y-%m-%d-%H" // hour
 	if t == 1 {
-		w = "date_format(savetime,'%Y-%m-%d')=date_format(now(),'%Y-%m-%d')" // day
+		w = "%Y-%m-%d)" // day
 	} else if t == 2 {
-		w = "YEARWEEK(savetime)=YEARWEEK(now())" // week
+		w = "%Y-%W" // week
 	} else if t == 3 {
-		w = "date_format(savetime,'%Y-%m')=date_format(now(),'%Y-%m')" // year
+		w = "%Y-%m" // month
 	}
-	rows, err := DB.Query("select username,sum(send),sum(receive) from datacount where " + w + " group by username")
+	rows, err := DB.Query("select username,sum(send),sum(receive) from datacount where strftime('" + w + "',savetime)=strftime('" + w + "','now') group by username")
 	if err != nil {
 		return nil, err
 	}
@@ -242,8 +242,8 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 			user.TrafficDay.Receive = dc.Second
 		}
 		if dc, ok := weekCounts[userName]; ok {
-			user.TraffioWeek.Send = dc.First
-			user.TraffioWeek.Receive = dc.Second
+			user.TrafficWeek.Send = dc.First
+			user.TrafficWeek.Receive = dc.Second
 		}
 		if dc, ok := monthCounts[userName]; ok {
 			user.TrafficMonth.Send = dc.First

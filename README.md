@@ -18,15 +18,17 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 2. 负载均衡
 
-3. 多线路并发选取最快到达
+3. 多梯子多线路并发选取最快路径
 
-3. 数据压缩
+3. 数据压缩、加密
 
 4. 认证加密
 
-5. 多用户
+5. 多用户，权限控制
 
-6. 手机App生成验证码登录(swift iOS客户端，Flutter 安卓/iOS客户端)
+6. 流量统计
+
+7. 手机App生成验证码登录(swift iOS客户端，Flutter 安卓/iOS客户端)
 
 <table><tbody><tr>
 <td><img src="validator1.png" alt="App screenshot" height="400"/></td>
@@ -36,7 +38,7 @@ nctst是一个 TCP to TCP 点对点连接工具
 
 
 
-<h3>后续计划支持：</h3>
+<h3>后续可考虑支持：</h3>
 
 1. UDP
 
@@ -48,15 +50,17 @@ nctst是一个 TCP to TCP 点对点连接工具
 ## Documentation
 
 
-<h3>简单用法：</h3>
+<h3>直通：</h3>
 
-ssh client ---> nctst client port -------------- nctst server ---> ssh server port
+配置config里的maptargets，实现远程端口映射到本地端口
+
+ssh client ---> nctst client local port -------------- nctst server ---> target ssh port
 
 相当于一个通道，中间通过多个路线并发和容灾保证连接持续性。
 
-<h3>复杂用法：</h3>
+<h3>代理：</h3>
 
-nctst服务端后边放一个socks5服务，就可以连接任何东西了，再借助路由上配置的iptables规则和redsocks工具转发就可以实现网段内透明连接机房任何服务
+nctst服务端自带socks5服务，可以连接任何TCP协议的目标，再借助路由上配置的iptables规则和redsocks工具转发就可以实现网段内透明连接机房任何服务
 
 
 

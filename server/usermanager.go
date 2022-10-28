@@ -48,7 +48,7 @@ type UserInfo struct {
 
 	TrafficHour  TrafficCountInfo
 	TrafficDay   TrafficCountInfo
-	TraffioWeek  TrafficCountInfo
+	TrafficWeek  TrafficCountInfo
 	TrafficMonth TrafficCountInfo
 }
 
@@ -94,5 +94,7 @@ func (h *UserManager) SaveCount(user *UserInfo, send, receive int64) {
 	_, err := DB.Exec("insert into datacount(username,send,receive) values(?,?,?)", user.UserName, send, receive)
 	if err != nil {
 		log.Printf("SaveCount error: %+v\n", err)
+	} else {
+		log.Printf("SaveCount %s s: %d r: %d", user.UserName, send, receive)
 	}
 }

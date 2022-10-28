@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -38,7 +39,7 @@ type Pair[T, U any] struct {
 
 func CheckError(err error) {
 	if err != nil {
-		log.Printf("%+v\n", err)
+		log.Printf("%+v\n%s\n", err, debug.Stack())
 		os.Exit(-1)
 	}
 }
@@ -139,6 +140,9 @@ func Max(x, y int) int {
 }
 
 func Xor(data []byte, key []byte) {
+	if len(key) == 0 {
+		return
+	}
 	kn := 0
 	for i, v := range data {
 		data[i] = v ^ key[kn]
@@ -172,6 +176,16 @@ func ReadUInt(reader io.Reader) (uint32, error) {
 	}
 
 	return binary.BigEndian.Uint32(buf[:]), nil
+}
+
+func ReadUInt64(reader io.Reader) (uint64, error) {
+	var buf [8]byte
+	_, err := io.ReadFull(reader, buf[:])
+	if err != nil {
+		return 0, err
+	}
+
+	return binary.BigEndian.Uint64(buf[:]), nil
 }
 
 func WriteUInt(writer io.Writer, n uint32) error {

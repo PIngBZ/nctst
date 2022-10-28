@@ -80,7 +80,6 @@ func getProxyListFromFile(proxyFile *ProxyFileInfo) *proxyclient.ProxyFileInfo {
 		log.Printf("getProxyListFromFile %+v\n", err)
 		return nil
 	}
-
 	return loadProxyListFromData(content, proxyFile.Password)
 }
 
@@ -135,15 +134,17 @@ func selectProxyFromGroup(group *proxyclient.ProxyListGroup, num int) []*proxycl
 			work, ok := <-workChan
 			if ok {
 				client := proxyclient.NewProxyClient(work, config.Server)
-				if client.Ping(nil) {
+				if client.Ping(client, nil) {
 					pingResultChan <- nctst.Pair[uint32, *proxyclient.ProxyInfo]{First: client.LastPing(), Second: work}
 				}
+				println(4444)
 			}
 			waitGroup.Done()
 		}()
 	}
 
 	waitGroup.Wait()
+	println(444)
 
 	close(pingResultChan)
 

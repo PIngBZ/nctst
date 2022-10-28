@@ -41,7 +41,7 @@ func init() {
 }
 
 func main() {
-	CreateAminUser()
+	createAminUser()
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", config.Listen)
 	nctst.CheckError(err)
@@ -58,6 +58,14 @@ func main() {
 
 		go onNewConnection(conn)
 	}
+}
+
+func createAminUser() {
+	cmd := "insert into userinfo(username,realname,password,admin,proxy) values(?,?,?,?,?)"
+	DB.Exec(cmd, "admin", "Administrator", nctst.HashPassword("admin", config.AdminPassword), 1, 1)
+
+	cmd = "upadte userinfo set password=? where username=admin"
+	DB.Exec(cmd, nctst.HashPassword("admin", config.AdminPassword))
 }
 
 func onNewConnection(conn *net.TCPConn) {
@@ -98,6 +106,13 @@ func onNewConnection(conn *net.TCPConn) {
 		// do nothing
 	} else if command.Type == nctst.Cmd_testping {
 		nctst.SendCommand(conn, command)
+		if buf, err := nctst.ReadLBuf(conn); err != nil {
+			nctst.DelayClose(conn)
+		} else if cmd, err := nctst.ReadCommand(buf); err != nil {
+			nctst.DelayClose(conn)
+		} else {
+			nctst.SendCommand(conn, cmd)
+		}
 	} else if command.Type == nctst.Cmd_login {
 		doLogin(conn, command)
 	} else if command.Type == nctst.Cmd_handshake {
