@@ -149,7 +149,7 @@ func SendCommand(conn io.Writer, command *Command) error {
 		return err
 	}
 
-	if _, err := WriteData(data, conn, len(data)); err != nil {
+	if _, err := WriteData(conn, data); err != nil {
 		return err
 	}
 

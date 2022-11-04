@@ -1,11 +1,12 @@
 
 .DS_Store
-client/.DS_Store
 client/client
-client/flog.txt
-server/.DS_Store
-server/flog.txt
+flog.txt
 server/server
 server/data.db
 xcuserdata
 Pods
+test.json
+*.yaml
+.vscode
+proxylistgenerator/proxylistgenerator

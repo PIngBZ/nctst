@@ -6,10 +6,12 @@ import (
 )
 
 type Config struct {
-	Port       int              `json:"port"`
-	Key        string           `json:"key"`
-	Password   string           `json:"password"`
-	Generators []*GeneratorItem `json:"generators"`
+	Key        string `json:"key"`
+	UserName   string `json:"username"`
+	Password   string `json:"password"`
+	SrcFile    string `json:"srcfile"`
+	ServerHost string `json:"serverhost"`
+	ServerPort int    `json:"serverport"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

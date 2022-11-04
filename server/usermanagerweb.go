@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"math/rand"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/PIngBZ/nctst/proxyclient"
 	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/render"
@@ -20,6 +22,7 @@ import (
 var (
 	LoginUserContextKey  = &nctst.ContextKey{Key: "login_user_context_key"}
 	TargetUserContextKey = &nctst.ContextKey{Key: "user_context_key"}
+	proxyGroupsData      = []byte{}
 )
 
 func init() {
@@ -39,6 +42,8 @@ func (h *UserManager) daemon() {
 
 	r.Get("/initdev", h.initAuthDevice)
 	r.Get("/authcode", h.generateAuthCode)
+	r.Post("/updateProxylist", h.upadteProxyList)
+	r.Get("/proxylist", h.proxyList)
 	r.Get("/exit", h.exit)
 
 	r.Route("/users", func(r chi.Router) {
@@ -47,7 +52,7 @@ func (h *UserManager) daemon() {
 		r.Post("/commit", h.commitUser)
 
 		r.Route("/{username}", func(r chi.Router) {
-			r.Use(h.userCtx)
+			r.Use(h.targetUserCtx)
 			r.Get("/del", h.deleteUser)
 			r.Get("/admin", h.changeAdmin)
 			r.Get("/changepwd", h.changePwd)
@@ -97,7 +102,7 @@ func (h *UserManager) isAdmin(r *http.Request) bool {
 	return user.Admin
 }
 
-func (h *UserManager) userCtx(next http.Handler) http.Handler {
+func (h *UserManager) targetUserCtx(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var user *UserInfo
 		var err error
@@ -521,4 +526,44 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserManager) exit(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "exit success", http.StatusUnauthorized)
+}
+
+func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
+	defer r.Body.Close()
+
+	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	if !h.isAdmin(r) {
+		render.Render(w, r, ErrForbiddenNeedAdmin)
+		return
+	}
+
+	buf, err := nctst.ReadLBuf(r.Body)
+	if err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	nctst.Xor(buf.Data(), []byte(user.UserName))
+	nctst.Xor(buf.Data(), []byte(config.Key))
+
+	var proxyGroups *proxyclient.ProxyGroups
+	if err := json.Unmarshal(buf.Data(), &proxyGroups); err != nil {
+		render.Render(w, r, ErrInternal(err))
+		return
+	}
+
+	proxyGroupsData = buf.Data()
+}
+
+func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	buf := nctst.DataBufPool.Get()
+	nctst.WriteData(buf, proxyGroupsData)
+
+	nctst.Xor(buf.Data()[4:], []byte(config.Key))
+	nctst.Xor(buf.Data()[4:], []byte(user.UserName))
+
+	w.Write(buf.Data())
 }

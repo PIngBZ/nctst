@@ -10,20 +10,38 @@
     "proxies": [
         {
             "type": "socks5",
+            "name": "",
             "host": "127.0.0.1",
             "port": 8889,
             "connnum": 3
         }, {
-            "type": "socks5",
+            "type": "trojan",
+            "name": "",
             "host": "127.0.0.1",
             "port": 8889,
+            "loginname": "",
+            "password": "",
+            "connnum": 3
+        }, {
+            "type": "ssr",
+            "name": "",
+            "host": "127.0.0.1",
+            "port": 8889,
+            "password": "",
+            "params": {
+                "cipher": "",
+                "obfs": "",
+                "obfs-param": "",
+                "protocol": "",
+                "protocol-param": ""
+            },
             "connnum": 3
         }
     ],
     "proxyfile": {
-        "_Remark": "type: file/net(x.x.x.x:xxx)",
+        "_Remark": "type: file/net(url: x.x.x.x:xxx)",
         "type": "file",
-        "url": "proxylist.json",
+        "url": "list.json",
         "key": "",
         "password": ""
     },

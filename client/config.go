@@ -14,7 +14,7 @@ type Config struct {
 	Listen     string                   `json:"listen"`
 	Server     *nctst.AddrInfo          `json:"server"`
 	Proxies    []*proxyclient.ProxyInfo `json:"proxies"`
-	ProxyFile  *ProxyFileInfo           `json:"proxyfile"`
+	ProxyFile  *proxyclient.ProxyFile   `json:"proxyfile"`
 	MapTargets []*nctst.AddrInfo        `json:"maptargets"`
 	Compress   bool                     `json:"compress"`
 	Key        string                   `json:"key"`

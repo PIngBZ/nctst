@@ -7,6 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net"
+	"time"
 
 	"github.com/PIngBZ/nctst"
 )
@@ -32,7 +34,8 @@ func (h *TrojanClient) Connect() error {
 		ServerName:         h.Server.LoginName,
 	}
 
-	conn, err := tls.Dial("tcp", h.Server.Address(), conf)
+	dialer := &net.Dialer{Timeout: time.Second * 2}
+	conn, err := tls.DialWithDialer(dialer, "tcp", h.Server.Address(), conf)
 	if err != nil {
 		return err
 	}

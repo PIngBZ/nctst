@@ -117,7 +117,7 @@ func startUpstreamProxies() {
 	}
 
 	if config.ProxyFile != nil {
-		serverList := GetProxyList(config.ProxyFile)
+		serverList := proxyclient.GetProxyList(config.ProxyFile, &proxyclient.PingTarget{Target: config.Server, PingThreads: 5})
 		proxyList = append(proxyList, serverList...)
 		log.Printf("found %d items from server %s\n", len(serverList), config.ProxyFile)
 	}

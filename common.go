@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
@@ -154,10 +153,11 @@ func ToUint(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
-func WriteData(data []byte, dst io.Writer, written int) (int, error) {
+func WriteData(writer io.Writer, data []byte) (int, error) {
 	var err error
+	var written int
 
-	nw, ew := dst.Write(data)
+	nw, ew := writer.Write(data)
 	written += nw
 
 	if ew != nil {
@@ -166,6 +166,18 @@ func WriteData(data []byte, dst io.Writer, written int) (int, error) {
 		err = io.ErrShortWrite
 	}
 	return written, err
+}
+
+func WriteLData(writer io.Writer, data []byte) error {
+	if err := WriteUInt(writer, uint32(len(data))); err != nil {
+		return err
+	}
+	if n, err := writer.Write(data); err != nil {
+		return err
+	} else if n != len(data) {
+		return io.ErrShortWrite
+	}
+	return nil
 }
 
 func ReadUInt(reader io.Reader) (uint32, error) {
@@ -243,7 +255,7 @@ func ReadLBuf(reader io.Reader) (*BufItem, error) {
 		return nil, err
 	}
 
-	if l == 0 || l > MAX_TCP_DATA_INTERNET_LEN {
+	if l == 0 || l > DATA_BUF_SIZE {
 		return nil, fmt.Errorf("ReadLBuf read len error")
 	}
 
@@ -309,7 +321,7 @@ func HttpGetString(url string) (string, error) {
 
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}

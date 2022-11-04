@@ -3,8 +3,7 @@ package nctst
 import "fmt"
 
 const (
-	MAX_TCP_DATA_INTERNET_LEN = 1024 * 1024
-	DATA_BUF_SIZE             = 1024 * 64
+	DATA_BUF_SIZE             = 1024 * 1024
 
 	KCP_UDP_RECEIVE_BUF_NUM = 128
 	KCP_UDP_SEND_BUF_NUM    = 8
