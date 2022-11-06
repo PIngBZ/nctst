@@ -1,9 +1,8 @@
-package main
+package nctst
 
 import (
 	"net/http"
 
-	"github.com/PIngBZ/nctst"
 	"github.com/go-chi/render"
 )
 
@@ -112,7 +111,7 @@ type CodeResponse struct {
 
 func WriteResponse(w http.ResponseWriter, data interface{}) {
 	resp := APIResponse{Code: APIResponseCode_Success, StatusText: "success", Data: data}
-	if s, err := nctst.ToJson(resp); err != nil {
+	if s, err := ToJson(resp); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	} else {
 		w.Write([]byte(s))

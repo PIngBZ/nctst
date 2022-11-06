@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math/rand"
 	"net/http"
@@ -77,13 +78,13 @@ func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 		if err != nil {
 			log.Printf("basicAuth GetUser error %+v\n", err)
 			time.Sleep(time.Second * 2)
-			render.Render(w, r, ErrForbiddenErrLogin)
+			render.Render(w, r, nctst.ErrForbiddenErrLogin)
 			return
 		}
 
 		if nctst.HashPassword(name, pass) != user.Hash {
 			time.Sleep(time.Second * 5)
-			render.Render(w, r, ErrForbiddenErrLogin)
+			render.Render(w, r, nctst.ErrForbiddenErrLogin)
 			return
 		}
 
@@ -109,11 +110,11 @@ func (h *UserManager) targetUserCtx(next http.Handler) http.Handler {
 		if username := chi.URLParam(r, "username"); username != "" {
 			user, err = h.GetUser(username)
 		} else {
-			render.Render(w, r, ErrNotFound)
+			render.Render(w, r, nctst.ErrNotFound)
 			return
 		}
 		if err != nil {
-			render.Render(w, r, ErrNotFound)
+			render.Render(w, r, nctst.ErrNotFound)
 			return
 		}
 		ctx := context.WithValue(r.Context(), TargetUserContextKey, user)
@@ -216,7 +217,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 
 	rows, err := DB.Query(cmd)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 	defer rows.Close()
@@ -224,7 +225,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 	users := make([]*UserInfo, 0)
 	for rows.Next() {
 		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status, &proxy); err != nil {
-			render.Render(w, r, ErrInternal(err))
+			render.Render(w, r, nctst.ErrInternal(err))
 			return
 		}
 		user := &UserInfo{}
@@ -265,7 +266,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 
 	t, err := template.ParseFiles("html/listusers.html")
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -289,33 +290,33 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 
 	err = t.Execute(w, data)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 }
 
 func (h *UserManager) addUser(w http.ResponseWriter, r *http.Request) {
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	t, err := template.ParseFiles("html/adduser.html")
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
 	err = t.Execute(w, nil)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 }
 
 func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
@@ -326,7 +327,7 @@ func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 	realName := r.Form.Get("realname")
 
 	if userName == "" || pwd == "" || realName == "" {
-		render.Render(w, r, ErrInvalidRequest(errors.New("params error")))
+		render.Render(w, r, nctst.ErrInvalidRequest(errors.New("params error")))
 		return
 	}
 
@@ -341,7 +342,7 @@ func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 	cmd := "insert into userinfo(username,realname,password,admin) values(?,?,?,?)"
 	_, err := DB.Exec(cmd, userName, realName, pwd, admin)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -350,14 +351,14 @@ func (h *UserManager) commitUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserManager) deleteUser(w http.ResponseWriter, r *http.Request) {
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 	_, err := DB.Exec("delete from userinfo where id=?", user.ID)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -366,14 +367,14 @@ func (h *UserManager) deleteUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserManager) changeAdmin(w http.ResponseWriter, r *http.Request) {
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 
 	if user.UserName == "admin" {
-		render.Render(w, r, ErrForbidden)
+		render.Render(w, r, nctst.ErrForbidden)
 		return
 	}
 
@@ -383,7 +384,7 @@ func (h *UserManager) changeAdmin(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err := DB.Exec("update userinfo set admin=? where id=?", toAdmin, user.ID)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -395,19 +396,19 @@ func (h *UserManager) changePwd(w http.ResponseWriter, r *http.Request) {
 	target, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 
 	if !h.isAdmin(r) && login.ID != target.ID {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	t, err := template.ParseFiles("html/changepwd.html")
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
 	err = t.Execute(w, target)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 }
@@ -417,20 +418,20 @@ func (h *UserManager) commitPwd(w http.ResponseWriter, r *http.Request) {
 	target, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 
 	if !h.isAdmin(r) && login.ID != target.ID {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	r.ParseForm()
 	newPwd := r.Form.Get("password")
 	if len(newPwd) < 6 {
-		render.Render(w, r, ErrForbiddenPwdTooShort)
+		render.Render(w, r, nctst.ErrForbiddenPwdTooShort)
 		return
 	}
 
 	_, err := DB.Exec("update userinfo set password=? where id=?", nctst.HashPassword(target.UserName, newPwd), target.ID)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -439,7 +440,7 @@ func (h *UserManager) commitPwd(w http.ResponseWriter, r *http.Request) {
 
 func (h *UserManager) changeProxy(w http.ResponseWriter, r *http.Request) {
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
@@ -451,7 +452,7 @@ func (h *UserManager) changeProxy(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err := DB.Exec("update userinfo set proxy=? where id=?", toOpenProxy, user.ID)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -465,7 +466,7 @@ func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
 
 	session := r.Form.Get("session")
 	if session != user.Session {
-		render.Render(w, r, ErrForbiddenNeedInit)
+		render.Render(w, r, nctst.ErrForbiddenNeedInit)
 		return
 	}
 
@@ -478,9 +479,9 @@ func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		seconds := int(time.Until(info.Time.Add(time.Second*60)) / time.Second)
-		WriteResponse(w, &CodeResponse{AuthCode: info.Code, Seconds: seconds})
+		nctst.WriteResponse(w, &nctst.CodeResponse{AuthCode: info.Code, Seconds: seconds})
 	} else {
-		WriteResponse(w, &CodeResponse{AuthCode: newCode.Code, Seconds: 60})
+		nctst.WriteResponse(w, &nctst.CodeResponse{AuthCode: newCode.Code, Seconds: 60})
 	}
 }
 
@@ -490,37 +491,37 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 
 	initCodeS := r.Form.Get("code")
 	if initCodeS == "" {
-		render.Render(w, r, ErrInvalidRequest(errors.New("error params")))
+		render.Render(w, r, nctst.ErrInvalidRequest(errors.New("error params")))
 		return
 	}
 	initCode, err := strconv.Atoi(initCodeS)
 	if err != nil {
-		render.Render(w, r, ErrInvalidRequest(err))
+		render.Render(w, r, nctst.ErrInvalidRequest(err))
 		return
 	}
 
 	if ta := h.initCodeTime.Load(); ta == nil {
-		render.Render(w, r, ErrForbidden)
+		render.Render(w, r, nctst.ErrForbidden)
 		return
 	} else {
 		t := ta.(time.Time)
 		if !t.Add(time.Minute * 5).After(time.Now()) {
-			render.Render(w, r, ErrForbidden)
+			render.Render(w, r, nctst.ErrForbidden)
 			return
 		}
 
 		if initCode != int(h.initCode.Load()) {
-			render.Render(w, r, ErrForbidden)
+			render.Render(w, r, nctst.ErrForbidden)
 			return
 		}
 
 		session := uuid.NewString()
 		if _, err := DB.Exec("update userinfo set session=? where id=?", session, user.ID); err != nil {
-			render.Render(w, r, ErrInternal(err))
+			render.Render(w, r, nctst.ErrInternal(err))
 			return
 		}
 
-		WriteResponse(w, &InitResponse{Session: session})
+		nctst.WriteResponse(w, &nctst.InitResponse{Session: session})
 	}
 }
 
@@ -534,13 +535,13 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
 
 	if !h.isAdmin(r) {
-		render.Render(w, r, ErrForbiddenNeedAdmin)
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
 		return
 	}
 
 	buf, err := nctst.ReadLBuf(r.Body)
 	if err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInternal(err))
 		return
 	}
 
@@ -549,11 +550,25 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 
 	var proxyGroups *proxyclient.ProxyGroups
 	if err := json.Unmarshal(buf.Data(), &proxyGroups); err != nil {
-		render.Render(w, r, ErrInternal(err))
+		render.Render(w, r, nctst.ErrInvalidRequest(err))
 		return
 	}
 
+	if len(proxyGroups.Groups) == 0 {
+		render.Render(w, r, nctst.ErrInvalidRequest(errors.New("no group")))
+		return
+	}
+
+	for _, group := range proxyGroups.Groups {
+		if len(group.List) == 0 {
+			render.Render(w, r, nctst.ErrInvalidRequest(fmt.Errorf("empty list of group %s", group.Name)))
+			return
+		}
+	}
+
 	proxyGroupsData = buf.Data()
+
+	nctst.WriteResponse(w, &nctst.APIResponse{Code: nctst.APIResponseCode_Success, StatusText: "success"})
 }
 
 func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {

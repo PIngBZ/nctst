@@ -89,19 +89,23 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 
 	defer h.Close()
 
-	printf("Connecting %s\n", hh.Server.Address())
+	printf("Connecting %s %s\n", hh.Server.Name, hh.Server.Address())
 	if err := h.Connect(); err != nil {
 		printf("Connect Failed %s %+v\n", hh.Server.Address(), err)
-		finished(h, 0, err)
+		if finished != nil {
+			finished(h, 0, err)
+		}
 		return false
 	}
 
 	h.SetDeadline(time.Now().Add(time.Second * 8))
 
-	printf("WriteUInt1 %s\n", hh.Server.Address())
+	printf("SendHeader %s\n", hh.Server.Address())
 	if err := nctst.WriteUInt(h, nctst.NEW_CONNECTION_KEY); err != nil {
-		printf("WriteUInt1 Failed %s %+v\n", hh.Server.Address(), err)
-		finished(h, 0, err)
+		printf("SendHeader Failed %s %+v\n", hh.Server.Address(), err)
+		if finished != nil {
+			finished(h, 0, err)
+		}
 		return false
 	}
 
@@ -109,14 +113,16 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 	cmd := &nctst.CommandTestPing{}
 	if err := nctst.SendCommand(h, &nctst.Command{Type: nctst.Cmd_testping, Item: cmd}); err != nil {
 		printf("SendCommand1 Failed %s %+v\n", hh.Server.Address(), err)
-		finished(h, 0, err)
+		if finished != nil {
+			finished(h, 0, err)
+		}
 		return false
 	}
 
 	printf("Receive1 %s\n", hh.Server.Address())
 	_, err := nctst.ReadLBuf(h)
 	if err != nil {
-		printf("ReadLBuf1 Failed %s %+v\n", hh.Server.Address(), err)
+		printf("Receive1 Failed %s %+v\n", hh.Server.Address(), err)
 		if finished != nil {
 			finished(h, 0, err)
 		}
@@ -136,7 +142,7 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 	printf("Receive2 %s\n", hh.Server.Address())
 	buf, err := nctst.ReadLBuf(h)
 	if err != nil {
-		printf("ReadLBuf2 Failed %s %+v\n", hh.Server.Address(), err)
+		printf("Receive2 Failed %s %+v\n", hh.Server.Address(), err)
 		if finished != nil {
 			finished(h, 0, err)
 		}
@@ -145,7 +151,7 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 
 	command, err := nctst.ReadCommand(buf)
 	if err != nil {
-		printf("ReadCommand2 Failed %s %+v\n", hh.Server.Address(), err)
+		printf("ReadCommand Failed %s %+v\n", hh.Server.Address(), err)
 		if finished != nil {
 			finished(h, 0, err)
 		}
@@ -154,7 +160,8 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 
 	if command.Type != nctst.Cmd_testping {
 		if finished != nil {
-			finished(h, 0, errors.New("testping ret type error"))
+			finished(h, 0, errors.New("command type error"))
+			printf("ReadCommand Failed %s command type error\n", hh.Server.Address())
 		}
 		return false
 	}
@@ -164,7 +171,7 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 	ping := uint32(time.Now().UnixNano()/1e6 - ret.SendTime)
 
 	hh.TestPing = ping
-	printf("PingResult %d\n", ping)
+	printf("PingResult %s %d\n", hh.Server.Address(), ping)
 	if finished != nil {
 		finished(h, ping, nil)
 	}

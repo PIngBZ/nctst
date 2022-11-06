@@ -5,6 +5,9 @@ import os
 import re
 import json
 
+SelectPerGroup = 2
+ConnNumPerServer= 3
+
 # generator.py output.json in1.yaml in2.yaml in....yaml
 if len(sys.argv) < 3:
     print("params error")
@@ -25,7 +28,7 @@ def src2group(file):
     r = p.findall(content)
 
     for m in r:
-        proxy = {'connnum': 3}
+        proxy = {'connnum': ConnNumPerServer}
         params = {}
 
         items = m.split(',')
@@ -52,7 +55,7 @@ def src2group(file):
         return None
     return group
 
-result = { 'selectpergroup': 3, 'groups': []}
+result = { 'selectpergroup': SelectPerGroup, 'groups': []}
 
 for f in sys.argv[2:]:
     group = src2group(f)

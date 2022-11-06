@@ -2,7 +2,6 @@ package proxyclient
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -112,12 +111,6 @@ func SelectProxyFromGroupsInfo(proxyGroups *ProxyGroups, pingTarget *PingTarget)
 }
 
 func SelectProxyFromGroup(group *ProxyGroup, num int, pingTarget *PingTarget, printDetails bool) []*ProxyInfo {
-	printf := func(format string, a ...any) {
-		if printDetails {
-			fmt.Printf(format, a...)
-		}
-	}
-
 	workChan := make(chan *ProxyInfo, len(group.List))
 	pingResultChan := make(chan nctst.Pair[uint32, *ProxyInfo], len(group.List))
 
@@ -133,27 +126,33 @@ func SelectProxyFromGroup(group *ProxyGroup, num int, pingTarget *PingTarget, pr
 	}
 	for i := 0; i < pingTarget.PingThreads; i++ {
 		go func() {
-			work, ok := <-workChan
-			if ok {
-				client := NewProxyClient(work, pingTarget.Target)
-				printf("NewProxyClient %s", pingTarget.Target.Address())
-				if client.Ping(client, printDetails, nil) {
-					pingResultChan <- nctst.Pair[uint32, *ProxyInfo]{First: client.LastPing(), Second: work}
+			for {
+				work, ok := <-workChan
+				if ok {
+					client := NewProxyClient(work, pingTarget.Target)
+					if client.Ping(client, printDetails, nil) {
+						pingResultChan <- nctst.Pair[uint32, *ProxyInfo]{First: client.LastPing(), Second: work}
+					}
 				}
+				waitGroup.Done()
 			}
-			waitGroup.Done()
 		}()
 	}
+
+	pingResult := make([]nctst.Pair[uint32, *ProxyInfo], 0)
+
+	go func() {
+		n, total := 1, len(group.List)
+		for p := range pingResultChan {
+			pingResult = append(pingResult, p)
+			log.Printf("%d/%d %dms %s\n", n, total, p.First, p.Second.Name)
+			n++
+		}
+	}()
 
 	waitGroup.Wait()
 
 	close(pingResultChan)
-
-	pingResult := make([]nctst.Pair[uint32, *ProxyInfo], 0)
-
-	for p := range pingResultChan {
-		pingResult = append(pingResult, p)
-	}
 
 	sort.SliceStable(pingResult, func(i, j int) bool {
 		return pingResult[i].First < pingResult[j].First

@@ -3,6 +3,15 @@
     "username": "",
     "password": "",
     "srcfile": "test.json",
-    "serverhost": "",
-    "serverport": 1234
+    "target": {
+        "host": "",
+        "port": 12345
+    },
+    "selectpergroup": 5,
+    "pingthreadnum": 10,
+    "publishserver": {
+        "host": "",
+        "port": 12345
+    },
+    "publishtimeout": 10
 }

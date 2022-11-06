@@ -3,15 +3,20 @@ package main
 import (
 	"encoding/json"
 	"os"
+
+	"github.com/PIngBZ/nctst"
 )
 
 type Config struct {
-	Key        string `json:"key"`
-	UserName   string `json:"username"`
-	Password   string `json:"password"`
-	SrcFile    string `json:"srcfile"`
-	ServerHost string `json:"serverhost"`
-	ServerPort int    `json:"serverport"`
+	Key            string          `json:"key"`
+	UserName       string          `json:"username"`
+	Password       string          `json:"password"`
+	SrcFile        string          `json:"srcfile"`
+	Target         *nctst.AddrInfo `json:"target"`
+	SelectPerGroup int             `json:"selectpergroup"`
+	PingThreadNum  int             `json:"pingthreadnum"`
+	PublishServer  *nctst.AddrInfo `json:"publishserver"`
+	PublishTimeout int             `json:"publishtimeout"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

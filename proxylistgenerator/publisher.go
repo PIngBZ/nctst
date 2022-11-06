@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -37,18 +38,17 @@ func init() {
 	var err error
 	config, err = parseConfig(configFile)
 	nctst.CheckError(err)
-	nctst.CommandXorKey = config.Password
+	nctst.CommandXorKey = config.Key
 }
 
 func main() {
 	fileInfo := &proxyclient.ProxyFile{Type: "file", Url: config.SrcFile}
-	server := &nctst.AddrInfo{Host: config.ServerHost, Port: config.ServerPort}
-	pingTarget := &proxyclient.PingTarget{Target: server, PingThreads: 1}
+	pingTarget := &proxyclient.PingTarget{Target: config.Target, PingThreads: config.PingThreadNum}
 
 	proxyInfo := proxyclient.GetProxyListFromFile(fileInfo)
 
 	for _, group := range proxyInfo.Groups {
-		proxylist := proxyclient.SelectProxyFromGroup(group, 15, pingTarget, true)
+		proxylist := proxyclient.SelectProxyFromGroup(group, config.SelectPerGroup, pingTarget, true)
 		group.List = proxylist
 	}
 
@@ -64,16 +64,21 @@ func main() {
 	nctst.Xor(buf, []byte(config.UserName))
 
 	client := &http.Client{
-		Timeout: time.Second * 10,
+		Timeout: time.Second * time.Duration(config.PublishTimeout),
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:%d/updateProxylist", config.ServerHost, config.ServerPort), nil)
+	url := fmt.Sprintf("http://%s/updateProxylist", config.PublishServer.Address())
+	buffer := bytes.NewBuffer([]byte{})
+	nctst.WriteLData(buffer, buf)
+	req, err := http.NewRequest("POST", url, buffer)
 	if err != nil {
 		log.Printf("NewRequest %+v\n", err)
 		return
 	}
 
-	req.SetBasicAuth(config.UserName, nctst.HashPassword(config.UserName, config.Password))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(config.UserName, config.Password)
+
 	response, err := client.Do(req)
 	if err != nil {
 		log.Printf("http request %+v\n", err)
@@ -81,14 +86,25 @@ func main() {
 	}
 	defer response.Body.Close()
 
-	if response.StatusCode != 200 {
-		log.Printf("Error, StatusCode = %d", response.StatusCode)
-		return
-	}
-
 	ret, err := io.ReadAll(response.Body)
 	if err != nil {
 		log.Printf("ReadAll %+v\n", err)
+		return
+	}
+
+	if response.StatusCode != 200 {
+		log.Printf("Error, StatusCode = %d\n%s\n", response.StatusCode, string(ret))
+		return
+	}
+
+	apiResp := &nctst.APIResponse{}
+	if err = json.Unmarshal(ret, apiResp); err != nil {
+		log.Printf("Error, Response json Unmarshal %+v\n", err)
+		return
+	}
+
+	if apiResp.Code != nctst.APIResponseCode_Success {
+		log.Printf("Error, Response json code= %d\n", apiResp.Code)
 		return
 	}
 
