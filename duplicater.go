@@ -3,6 +3,7 @@ package nctst
 import (
 	"log"
 	"sync"
+	"time"
 )
 
 type Duplicater struct {
@@ -55,14 +56,16 @@ func (h *Duplicater) daemon() {
 		case item := <-h.input:
 			h.updateTunnelsList()
 
-			item.SetMetaData(item.Size())
+			start := time.Now().UnixNano()
 		out:
-			for item.Size() < 512 {
+			for item.Size() < 1024 {
 				select {
 				case next := <-h.input:
-					WriteUInt(item, uint32(next.Size()))
 					item.Append(next)
 					next.Release()
+					if (time.Now().UnixNano()-start)/1e6 >= 10 {
+						break out
+					}
 				default:
 					break out
 				}

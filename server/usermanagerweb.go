@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"text/template"
 	"time"
@@ -567,6 +568,8 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	proxyGroupsData = buf.Data()
+
+	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0666)
 
 	nctst.WriteResponse(w, &nctst.APIResponse{Code: nctst.APIResponseCode_Success, StatusText: "success"})
 }

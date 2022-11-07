@@ -3,6 +3,7 @@
 client/client
 flog.txt
 server/server
+*.exe
 server/data.db
 xcuserdata
 Pods

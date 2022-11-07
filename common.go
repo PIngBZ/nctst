@@ -27,6 +27,10 @@ var (
 	DelayCloseNum uint32 = 0
 )
 
+type BuffersWriter interface {
+	WriteBuffers(v [][]byte) (n int, err error)
+}
+
 type ContextKey struct {
 	Key string
 }
@@ -59,7 +63,7 @@ func SmuxConfig() *smux.Config {
 	smuxConfig := smux.DefaultConfig()
 	smuxConfig.Version = 1
 	smuxConfig.MaxFrameSize = 1024 * 4
-	smuxConfig.MaxReceiveBuffer = 1024 * 1024
+	smuxConfig.MaxReceiveBuffer = 1024 * 1024 * 8
 	smuxConfig.KeepAliveInterval = time.Second * 30
 	smuxConfig.KeepAliveTimeout = time.Hour * 24 * 30
 
