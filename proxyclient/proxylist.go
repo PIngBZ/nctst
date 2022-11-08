@@ -53,6 +53,11 @@ func GetProxyListFromNet(proxyFile *ProxyFile, key, userName, password string) *
 	}
 	defer response.Body.Close()
 
+	if response.StatusCode != 200 {
+		log.Printf("GetProxyListFromNet response statuscode %s %d\n", proxyFile.Url, response.StatusCode)
+		return nil
+	}
+
 	buf := nctst.DataBufPool.Get()
 	if _, err = buf.SetAllFromReader(response.Body); err != nil {
 		log.Printf("GetProxyListFromNet read body %s %+v\n", proxyFile.Url, err)
