@@ -42,7 +42,7 @@ func NewKcp(connID uint) *Kcp {
 
 	h.session.SetStreamMode(true)
 	h.session.SetWriteDelay(false)
-	h.session.SetNoDelay(1, 30, 0, 1)
+	h.session.SetNoDelay(1, 10, 0, 1)
 	h.session.SetWindowSize(64, 64)
 	h.session.SetMtu(1024 * 8)
 	h.session.SetACKNoDelay(true)
@@ -106,9 +106,9 @@ func (h *Kcp) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		h.receivedPackages1[idx] = true
 		h.receivedPackages2[idx] = true
 		h.receivePackageTimes++
-		if h.receivePackageTimes == 200 {
+		if h.receivePackageTimes == 100 {
 			h.receivedPackages1 = make(map[uint32]bool)
-		} else if h.receivePackageTimes == 400 {
+		} else if h.receivePackageTimes == 200 {
 			h.receivedPackages2 = make(map[uint32]bool)
 			h.receivePackageTimes = 0
 		}
@@ -127,10 +127,10 @@ func (h *Kcp) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 
 func (h *Kcp) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	buf := DataBufPool.Get()
-	binary.BigEndian.PutUint32(buf.OriginBuf(), uint32(4+len(p)))
-	binary.BigEndian.PutUint32(buf.OriginBuf()[4:], h.nextPackageID)
+	var ubuf [4]byte
+	binary.BigEndian.PutUint32(ubuf[:], h.nextPackageID)
 	h.nextPackageID++
-	buf.AddSize(8)
+	buf.AppendData(ubuf[:])
 	buf.AppendData(p)
 	h.OutputChan <- buf
 	return len(p), nil
