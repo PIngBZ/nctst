@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"net"
+	"net/http"
 	"os"
 	"sort"
 	"sync"
@@ -20,10 +20,10 @@ const (
 	ProxyTypeTrojan
 )
 
-func GetProxyList(proxyFile *ProxyFile, pingTarget *PingTarget) []*ProxyInfo {
+func GetProxyList(proxyFile *ProxyFile, pingTarget *PingTarget, key, userName, password string) []*ProxyInfo {
 	var proxyGroups *ProxyGroups
 	if proxyFile.Type == "net" {
-		proxyGroups = GetProxyListFromNet(proxyFile)
+		proxyGroups = GetProxyListFromNet(proxyFile, key, userName, password)
 	} else if proxyFile.Type == "file" {
 		proxyGroups = GetProxyListFromFile(proxyFile)
 	} else {
@@ -33,27 +33,34 @@ func GetProxyList(proxyFile *ProxyFile, pingTarget *PingTarget) []*ProxyInfo {
 	return SelectProxyFromGroupsInfo(proxyGroups, pingTarget)
 }
 
-func GetProxyListFromNet(proxyFile *ProxyFile) *ProxyGroups {
+func GetProxyListFromNet(proxyFile *ProxyFile, key, userName, password string) *ProxyGroups {
 	log.Printf("**Request proxy list from %s ...", proxyFile.Url)
-	conn, err := net.DialTimeout("tcp", proxyFile.Url, time.Second*10)
+
+	req, err := http.NewRequest("GET", proxyFile.Url, nil)
 	if err != nil {
-		log.Printf("getProxyListFromNet %+v\n", err)
+		log.Printf("GetProxyListFromNet create request %s %+v\n", proxyFile.Url, err)
 		return nil
 	}
+	req.SetBasicAuth(userName, password)
 
-	defer conn.Close()
-
-	conn.SetDeadline(time.Now().Add(time.Second * 10))
-	if _, err := conn.Write([]byte(proxyFile.Key)); err != nil {
-		log.Printf("getProxyListFromNet %+v\n", err)
-		return nil
+	client := &http.Client{
+		Timeout: time.Second * 15,
 	}
-
-	buf, err := nctst.ReadLBuf(conn)
+	response, err := client.Do(req)
 	if err != nil {
-		log.Printf("getProxyListFromNet %+v\n", err)
+		log.Printf("GetProxyListFromNet do request %s %+v\n", proxyFile.Url, err)
 		return nil
 	}
+	defer response.Body.Close()
+
+	buf := nctst.DataBufPool.Get()
+	if _, err = buf.SetAllFromReader(response.Body); err != nil {
+		log.Printf("GetProxyListFromNet read body %s %+v\n", proxyFile.Url, err)
+		return nil
+	}
+
+	nctst.Xor(buf.Data()[4:], []byte(key))
+	nctst.Xor(buf.Data()[4:], []byte(userName))
 
 	return LoadProxyListFromData(buf.Data(), proxyFile.Password)
 }
@@ -101,7 +108,8 @@ func SelectProxyFromGroupsInfo(proxyGroups *ProxyGroups, pingTarget *PingTarget)
 	result := make([]*ProxyInfo, 0)
 
 	selectNum := proxyGroups.SelectPerGroup
-	for _, group := range proxyGroups.Groups {
+	for i, group := range proxyGroups.Groups {
+		log.Printf("**Ping group: %s, %d/%d\n", group.Name, i+1, len(proxyGroups.Groups))
 		some := SelectProxyFromGroup(group, selectNum, pingTarget, false)
 		result = append(result, some...)
 		selectNum = proxyGroups.SelectPerGroup + (selectNum - len(some))
@@ -142,18 +150,16 @@ func SelectProxyFromGroup(group *ProxyGroup, num int, pingTarget *PingTarget, pr
 	pingResult := make([]nctst.Pair[uint32, *ProxyInfo], 0)
 
 	go func() {
-		n, total := 1, len(group.List)
-		for p := range pingResultChan {
-			pingResult = append(pingResult, p)
-			log.Printf("%d/%d %dms %s\n", n, total, p.First, p.Second.Name)
-			n++
-		}
+		waitGroup.Wait()
+		close(pingResultChan)
 	}()
 
-	waitGroup.Wait()
-
-	close(pingResultChan)
-
+	n, total := 1, len(group.List)
+	for p := range pingResultChan {
+		pingResult = append(pingResult, p)
+		log.Printf("%d/%d %dms %s\n", n, total, p.First, p.Second.Name)
+		n++
+	}
 	sort.SliceStable(pingResult, func(i, j int) bool {
 		return pingResult[i].First < pingResult[j].First
 	})

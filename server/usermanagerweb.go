@@ -24,7 +24,7 @@ import (
 var (
 	LoginUserContextKey  = &nctst.ContextKey{Key: "login_user_context_key"}
 	TargetUserContextKey = &nctst.ContextKey{Key: "user_context_key"}
-	proxyGroupsData      = []byte{}
+	proxyGroupsData, _   = os.ReadFile("proxydata/current.json")
 )
 
 func init() {
@@ -569,13 +569,19 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 
 	proxyGroupsData = buf.Data()
 
-	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0666)
+	os.WriteFile("proxydata/current.json", proxyGroupsData, 0600)
+	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0600)
 
 	nctst.WriteResponse(w, &nctst.APIResponse{Code: nctst.APIResponseCode_Success, StatusText: "success"})
 }
 
 func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	if len(proxyGroupsData) == 0 {
+		render.Render(w, r, nctst.ErrNotFound)
+		return
+	}
 
 	buf := nctst.DataBufPool.Get()
 	nctst.WriteData(buf, proxyGroupsData)

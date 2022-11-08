@@ -15,27 +15,26 @@ var (
 	ErrLoginAuthCode  = errors.New("error auth code")
 )
 
-func WaittingLogin() {
+func WaittingLogin(proxyList []*proxyclient.ProxyInfo) {
 	log.Println("login ...")
 
-	for {
-		for _, p := range config.Proxies {
-			client := proxyclient.NewProxyClient(p, config.Server)
-			if client == nil {
-				continue
-			}
-
-			if err := tryLogin(client); err == nil {
-				log.Printf("login success %d\n", ClientID)
-				return
-			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
-				log.Printf("try login failed %s\n", p.Host)
-				nctst.CheckError(err)
-				return
-			} else {
-				log.Printf("try login failed %s %+v\n", p.Host, err)
-			}
+	for _, p := range proxyList {
+		client := proxyclient.NewProxyClient(p, config.Server)
+		if client == nil {
+			continue
 		}
+
+		if err := tryLogin(client); err == nil {
+			log.Printf("login success %d\n", ClientID)
+			return
+		} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
+			log.Printf("try login failed %s\n", p.Host)
+			nctst.CheckError(err)
+			return
+		} else {
+			log.Printf("try login failed %s %+v\n", p.Host, err)
+		}
+
 		log.Println("wait 5s to retry ...")
 		time.Sleep(time.Second * 5)
 	}

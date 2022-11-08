@@ -64,7 +64,12 @@ func main() {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	nctst.CheckError(err)
 
-	WaittingLogin()
+	proxyList := requestProxyList()
+	if len(proxyList) == 0 {
+		nctst.CheckError(errors.New("no proxy server"))
+	}
+
+	WaittingLogin(proxyList)
 
 	kcp = nctst.NewKcp(ClientID)
 	duplicater = nctst.NewDuplicater(kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 100, tunnels })
@@ -77,9 +82,11 @@ func main() {
 	}
 	nctst.CheckError(err)
 
-	startUpstreamProxies()
+	startUpstreamProxies(proxyList)
 
 	startMapTargetsLoop(smuxClient, config.MapTargets)
+
+	log.Printf("Start finished, socks5 listening: %s\n\n", config.Listen)
 
 	for {
 		conn, err := listener.AcceptTCP()
@@ -109,7 +116,7 @@ func doTransfer(conn *net.TCPConn, smuxClient *smux.Session) {
 	go nctst.Transfer(conn, stream)
 }
 
-func startUpstreamProxies() {
+func requestProxyList() []*proxyclient.ProxyInfo {
 	var proxyList []*proxyclient.ProxyInfo
 	if len(config.Proxies) != 0 {
 		proxyList = config.Proxies
@@ -117,17 +124,16 @@ func startUpstreamProxies() {
 	}
 
 	if config.ProxyFile != nil {
-		serverList := proxyclient.GetProxyList(config.ProxyFile, &proxyclient.PingTarget{Target: config.Server, PingThreads: 5})
+		serverList := proxyclient.GetProxyList(config.ProxyFile, &proxyclient.PingTarget{Target: config.Server, PingThreads: 5}, config.Key, config.UserName, config.PassWord)
 		proxyList = append(proxyList, serverList...)
-		log.Printf("found %d items from server %s\n", len(serverList), config.ProxyFile)
+		log.Printf("**Found %d items from server %s\n", len(serverList), config.ProxyFile.Url)
 	}
 
-	if len(proxyList) == 0 {
-		nctst.CheckError(errors.New("no proxy server"))
-	}
+	return proxyList
+}
 
+func startUpstreamProxies(proxyList []*proxyclient.ProxyInfo) {
 	proxies = make([]*Proxy, len(proxyList))
-
 	for i, p := range config.Proxies {
 		tunnel := nctst.NewOuterTunnel(config.Key, uint(i), ClientID, kcp.InputChan, duplicater.Output)
 		proxies[i] = NewProxy(uint(i), p, tunnel)

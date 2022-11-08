@@ -61,7 +61,7 @@ func (h *Duplicater) daemon() {
 			for item.Size() < 1024 {
 				select {
 				case next := <-h.input:
-					item.Append(next)
+					item.AppendItem(next)
 					next.Release()
 					if (time.Now().UnixNano()-start)/1e6 >= 10 {
 						break out

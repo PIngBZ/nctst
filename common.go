@@ -264,7 +264,7 @@ func ReadLBuf(reader io.Reader) (*BufItem, error) {
 	}
 
 	buf := DataBufPool.Get()
-	if _, err = buf.ReadNFromReader(reader, int(l)); err != nil {
+	if _, err = buf.SetNFromReader(reader, int(l)); err != nil {
 		buf.Release()
 		return nil, err
 	}

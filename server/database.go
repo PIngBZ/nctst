@@ -27,6 +27,14 @@ func init() {
 	upgradeDatabase()
 }
 
+func createAminUser() {
+	cmd := "insert into userinfo(username,realname,password,admin,proxy) values(?,?,?,?,?)"
+	DB.Exec(cmd, "admin", "Administrator", nctst.HashPassword("admin", config.AdminPassword), 1, 1)
+
+	cmd = "upadte userinfo set password=? where username=admin"
+	DB.Exec(cmd, nctst.HashPassword("admin", config.AdminPassword))
+}
+
 func createConfigTable(db *sql.DB) {
 	cmd := `
 		CREATE TABLE IF NOT EXISTS config (
