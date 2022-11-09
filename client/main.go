@@ -135,8 +135,6 @@ func requestProxyList() []*proxyclient.ProxyInfo {
 func startUpstreamProxies(proxyList []*proxyclient.ProxyInfo) {
 	proxies = make([]*Proxy, len(proxyList))
 	for i, p := range proxyList {
-		tunnel := nctst.NewOuterTunnel(config.Key, uint(i), ClientID, kcp.InputChan, duplicater.Output)
-		proxies[i] = NewProxy(uint(i), p, tunnel)
-		tunnels = append(tunnels, tunnel)
+		proxies[i] = NewProxy(uint(i), p)
 	}
 }
