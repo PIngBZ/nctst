@@ -172,7 +172,7 @@ func (h *Client) saveCountLoop() {
 		select {
 		case <-h.die:
 			return
-		case <-time.Tick(time.Hour):
+		case <-time.Tick(time.Minute * 10):
 			h.saveCount(false)
 		}
 	}

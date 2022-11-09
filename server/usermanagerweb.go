@@ -24,10 +24,11 @@ import (
 var (
 	LoginUserContextKey  = &nctst.ContextKey{Key: "login_user_context_key"}
 	TargetUserContextKey = &nctst.ContextKey{Key: "user_context_key"}
-	proxyGroupsData      = []byte{}
+	proxyGroupsData      []byte
 )
 
 func init() {
+	loadProxyGroupData()
 	go UserMgr.daemon()
 }
 
@@ -506,7 +507,7 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		t := ta.(time.Time)
-		if !t.Add(time.Minute * 5).After(time.Now()) {
+		if t.Add(time.Minute * 5).Before(time.Now()) {
 			render.Render(w, r, nctst.ErrForbidden)
 			return
 		}
@@ -569,13 +570,42 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 
 	proxyGroupsData = buf.Data()
 
-	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0666)
+	os.WriteFile("proxydata/current.json", proxyGroupsData, 0600)
+	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0600)
 
 	nctst.WriteResponse(w, &nctst.APIResponse{Code: nctst.APIResponseCode_Success, StatusText: "success"})
 }
 
+func loadProxyGroupData() {
+	data, err := os.ReadFile("proxydata/current.json")
+	if err != nil {
+		log.Printf("loadProxyGroupData read failed %+v\n", err)
+		return
+	}
+
+	var proxyGroups *proxyclient.ProxyGroups
+	if err := json.Unmarshal(data, &proxyGroups); err != nil {
+		log.Printf("loadProxyGroupData decode failed %+v\n", err)
+		return
+	}
+
+	if len(proxyGroups.Groups) == 0 {
+		log.Printf("loadProxyGroupData no group, %s\n", string(data))
+		return
+	}
+
+	proxyGroupsData = data
+
+	log.Println("loadProxyGroupData success")
+}
+
 func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	if len(proxyGroupsData) == 0 {
+		render.Render(w, r, nctst.ErrNotFound)
+		return
+	}
 
 	buf := nctst.DataBufPool.Get()
 	nctst.WriteData(buf, proxyGroupsData)

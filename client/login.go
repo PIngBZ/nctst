@@ -15,27 +15,26 @@ var (
 	ErrLoginAuthCode  = errors.New("error auth code")
 )
 
-func WaittingLogin() {
+func WaittingLogin(proxyList []*proxyclient.ProxyInfo) {
 	log.Println("login ...")
 
-	for {
-		for _, p := range config.Proxies {
-			client := proxyclient.NewProxyClient(p, config.Server)
-			if client == nil {
-				continue
-			}
-
-			if err := tryLogin(client); err == nil {
-				log.Printf("login success %d\n", ClientID)
-				return
-			} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
-				log.Printf("try login failed %s\n", p.Host)
-				nctst.CheckError(err)
-				return
-			} else {
-				log.Printf("try login failed %s %+v\n", p.Host, err)
-			}
+	for _, p := range proxyList {
+		client := proxyclient.NewProxyClient(p, config.Server)
+		if client == nil {
+			continue
 		}
+
+		if err := tryLogin(client); err == nil {
+			log.Printf("login success %d\n", ClientID)
+			return
+		} else if err == ErrLoginAuthority || err == ErrLoginAuthCode {
+			log.Printf("try login failed %s\n", p.Host)
+			nctst.CheckError(err)
+			return
+		} else {
+			log.Printf("try login failed %s %+v\n", p.Host, err)
+		}
+
 		log.Println("wait 5s to retry ...")
 		time.Sleep(time.Second * 5)
 	}
@@ -74,6 +73,7 @@ func sendLoginCommand(conn io.Writer) error {
 	cmd.ClientUUID = UUID
 	cmd.Compress = config.Compress
 	cmd.Key = config.Key
+	log.Printf("**Do login code: %d, name: %s", cmd.AuthCode, cmd.UserName)
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }
 
@@ -98,7 +98,7 @@ func receiveLoginReply(conn io.Reader) error {
 	if cmd.Code == nctst.LoginReply_errAuthCode {
 		return ErrLoginAuthCode
 	} else if cmd.Code == nctst.LoginReply_errAuthority {
-		return ErrLoginAuthCode
+		return ErrLoginAuthority
 	}
 
 	ClientID = cmd.ClientID

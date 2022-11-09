@@ -130,8 +130,8 @@ func (h *Kcp) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	var ubuf [4]byte
 	binary.BigEndian.PutUint32(ubuf[:], h.nextPackageID)
 	h.nextPackageID++
-	buf.AppendData(ubuf[:])
-	buf.AppendData(p)
+	buf.AddSize(8)
+	buf.AppendBytes(p)
 	h.OutputChan <- buf
 	return len(p), nil
 }

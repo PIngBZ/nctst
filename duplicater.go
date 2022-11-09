@@ -60,8 +60,7 @@ func (h *Duplicater) daemon() {
 			for item.Size() < 512 {
 				select {
 				case next := <-h.input:
-					WriteUInt(item, uint32(next.Size()))
-					item.Append(next)
+					item.AppendItem(next)
 					next.Release()
 				default:
 					break out

@@ -12,9 +12,12 @@ type Proxy struct {
 	connectors map[uint]*ProxyConnector
 }
 
-func NewProxy(id uint, proxy *proxyclient.ProxyInfo, tunnel *nctst.OuterTunnel) *Proxy {
+func NewProxy(id uint, proxy *proxyclient.ProxyInfo) *Proxy {
 	h := &Proxy{}
 	h.ID = id
+
+	tunnel := nctst.NewOuterTunnel(config.Key, id, ClientID, kcp.InputChan, duplicater.Output)
+	tunnels = append(tunnels, tunnel)
 
 	h.connectors = make(map[uint]*ProxyConnector)
 	for i := 0; i < proxy.ConnNum; i++ {
