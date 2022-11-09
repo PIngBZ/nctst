@@ -81,7 +81,7 @@ func (h *UserManager) CheckAuthCode(username string, code int) bool {
 
 	if c, ok := h.authCodes.Load(username); ok {
 		info := c.(*CodeInfo)
-		if time.Now().After(info.Time.Add(time.Second * 65)) {
+		if info.Time.Add(time.Second * 65).Before(time.Now()) {
 			h.authCodes.Delete(username)
 			return false
 		}

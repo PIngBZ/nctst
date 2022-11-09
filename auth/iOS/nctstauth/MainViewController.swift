@@ -131,13 +131,17 @@ class MainViewController: UIViewController {
         codeBox.reloadInputString("")
         progressText.text = "正在请求"
         
-        DispatchQueue.global().async {
+        DispatchQueue.global().async { [weak self] in
+            guard let self = self else { return }
+            
             let urlSession = API.createRequestSession(self.userName, self.password)
             
             var request = URLRequest(url: URL(string: BASE_URL + "/authcode?session="+self.session)!)
             request.httpMethod = "GET"
             
-            let task = urlSession.dataTask(with: request) { data, resp, err in
+            let task = urlSession.dataTask(with: request) { [weak self] data, resp, err in
+                guard let self = self else { return }
+                
                 guard err == nil, let data = data else {
                     self.onFailed("请求失败 http \((resp as? HTTPURLResponse)?.statusCode ?? 0)", false)
                     return
@@ -165,11 +169,15 @@ class MainViewController: UIViewController {
                     return
                 }
                 
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
                     self.codeBox.reloadInputString("\(code)")
 
                     let start = Date().timeIntervalSince1970
-                    Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+                    Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] timer in
+                        guard let self = self else { return }
+                        
                         let delta = Date().timeIntervalSince1970 - start
                         let t = Double(seconds) - delta
                         
@@ -188,13 +196,15 @@ class MainViewController: UIViewController {
     }
     
     func onFailed(_ msg: String, _ needLogin: Bool) {
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
             self.view.makeToast(msg)
             if needLogin {
                 SceneDelegate.navi.popToRootViewController(animated: true)
             } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                    self.requestCode()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                    self?.requestCode()
                 }
             }
         }

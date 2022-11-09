@@ -73,6 +73,7 @@ func sendLoginCommand(conn io.Writer) error {
 	cmd.ClientUUID = UUID
 	cmd.Compress = config.Compress
 	cmd.Key = config.Key
+	log.Printf("**Do login code: %d, name: %s", cmd.AuthCode, cmd.UserName)
 	return nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_login, Item: cmd})
 }
 
@@ -97,7 +98,7 @@ func receiveLoginReply(conn io.Reader) error {
 	if cmd.Code == nctst.LoginReply_errAuthCode {
 		return ErrLoginAuthCode
 	} else if cmd.Code == nctst.LoginReply_errAuthority {
-		return ErrLoginAuthCode
+		return ErrLoginAuthority
 	}
 
 	ClientID = cmd.ClientID

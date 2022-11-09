@@ -507,7 +507,7 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		t := ta.(time.Time)
-		if !t.Add(time.Minute * 5).After(time.Now()) {
+		if t.Add(time.Minute * 5).Before(time.Now()) {
 			render.Render(w, r, nctst.ErrForbidden)
 			return
 		}
