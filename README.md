@@ -36,6 +36,12 @@ nctst是一个 TCP to TCP 点对点连接工具
 <td><img src="validator3.png" alt="App screenshot" height="400"/></td>
 </tr></tbody></table>
 
+8. 提供简单Windows GUI客户端，创建虚拟网卡拦截tcp请求并代理，实现透明代理效果
+
+<table><tbody><tr>
+<td><img src="win.png" alt="Windows GUI screenshot" height="250"/></td>
+</tr></tbody></table>
+
 
 
 <h3>后续可考虑支持：</h3>
