@@ -92,6 +92,7 @@ type APIResponseCode int
 
 const (
 	APIResponseCode_Success = iota
+	APIResponseCode_Failed
 )
 
 type APIResponse struct {
@@ -109,8 +110,17 @@ type CodeResponse struct {
 	Seconds  int `json:"seconds"`
 }
 
-func WriteResponse(w http.ResponseWriter, data interface{}) {
+func WriteSuccessResponse(w http.ResponseWriter, data interface{}) {
 	resp := APIResponse{Code: APIResponseCode_Success, StatusText: "success", Data: data}
+	if s, err := ToJson(resp); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+	} else {
+		w.Write([]byte(s))
+	}
+}
+
+func WriteErrorResponse(w http.ResponseWriter, data interface{}) {
+	resp := APIResponse{Code: APIResponseCode_Failed, StatusText: "failed", Data: data}
 	if s, err := ToJson(resp); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	} else {

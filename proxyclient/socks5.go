@@ -1,7 +1,6 @@
 package proxyclient
 
 import (
-	"io"
 	"time"
 
 	"github.com/PIngBZ/nctst"
@@ -47,32 +46,4 @@ func (h *Socks5Client) Connect() error {
 
 	h.Conn = conn
 	return nil
-}
-
-func (h *Socks5Client) Write(p []byte) (int, error) {
-	if h.Conn == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	n, err := h.Conn.Write(p)
-	return n, err
-}
-
-func (h *Socks5Client) Read(p []byte) (int, error) {
-	if h.Conn == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	n, err := h.Conn.Read(p)
-	return n, err
-}
-
-func (h *Socks5Client) Close() error {
-	if h.Conn == nil {
-		return nil
-	}
-
-	err := h.Conn.Close()
-	h.Conn = nil
-	return err
 }

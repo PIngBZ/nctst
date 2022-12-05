@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"sync"
+	"time"
 )
 
 type OuterConnection struct {
@@ -12,9 +13,10 @@ type OuterConnection struct {
 	TunnelID uint
 	Die      chan struct{}
 
-	conn               io.ReadWriteCloser
-	receiveChan        chan *BufItem
-	sendChan           chan *BufItem
+	conn        io.ReadWriteCloser
+	receiveChan chan *BufItem
+	sendChan    chan *BufItem
+
 	commandChan        chan *Command
 	commandReceiveChan chan *BufItem
 
@@ -55,6 +57,17 @@ func (h *OuterConnection) Close() {
 
 	if !once {
 		return
+	}
+
+outfor:
+	for {
+		select {
+		case cmd := <-h.commandChan:
+			time.Sleep(time.Second)
+			SendCommand(h.conn, cmd)
+		default:
+			break outfor
+		}
 	}
 
 	if h.conn != nil {

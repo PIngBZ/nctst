@@ -28,6 +28,7 @@ func NewTrojanClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
 
 func (h *TrojanClient) Connect() error {
 	h.Close()
+	h.headerWritten = false
 
 	conf := &tls.Config{
 		InsecureSkipVerify: true,
@@ -59,26 +60,6 @@ func (h *TrojanClient) Write(p []byte) (int, error) {
 
 	n, err := h.Conn.Write(p)
 	return n, err
-}
-
-func (h *TrojanClient) Read(p []byte) (int, error) {
-	if h.Conn == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	n, err := h.Conn.Read(p)
-	return n, err
-}
-
-func (h *TrojanClient) Close() error {
-	if h.Conn == nil {
-		return nil
-	}
-
-	err := h.Conn.Close()
-	h.Conn = nil
-	h.headerWritten = false
-	return err
 }
 
 func (h *TrojanClient) writeWithHeader(payload []byte) (int, error) {

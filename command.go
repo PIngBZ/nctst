@@ -28,6 +28,7 @@ const (
 	Cmd_testping
 	Cmd_login
 	Cmd_loginReply
+	Cmd_logout
 	Cmd_handshake
 	Cmd_handshakeReply
 	Cmd_ping
@@ -137,7 +138,7 @@ func SendCommand(conn io.Writer, command *Command) error {
 	data := []byte(js)
 	Xor(data, []byte(CommandXorKey))
 
-	if err := WriteUInt(conn, uint32(len(js)+8)); err != nil {
+	if err := WriteUInt(conn, uint32(len(data)+8)); err != nil {
 		return err
 	}
 
@@ -201,6 +202,8 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 		obj = &CommandLogin{}
 	case Cmd_loginReply:
 		obj = &CommandLoginReply{}
+	case Cmd_logout:
+		obj = &CommandLogout{}
 	case Cmd_handshake:
 		obj = &CommandHandshake{}
 	case Cmd_handshakeReply:
@@ -217,9 +220,19 @@ func ReadCommand(buf *BufItem) (*Command, error) {
 	return &Command{Type: CommandType(t), Item: obj}, nil
 }
 
+type CommandTarget uint32
+
+const (
+	CommandTarget_none CommandTarget = iota
+	CommandTarget_conn
+	CommandTarget_tunnel
+	CommandTarget_app
+)
+
 type Command struct {
-	Type CommandType
-	Item interface{}
+	Type   CommandType
+	Target CommandTarget
+	Item   interface{}
 }
 
 type CommandIdle struct {
@@ -252,6 +265,12 @@ type CommandLoginReply struct {
 	ClientUUID string
 	ClientID   uint
 	ConnectKey string
+	PingURL    string
+}
+
+type CommandLogout struct {
+	ClientUUID string
+	UserName   string
 }
 
 type CommandHandshake struct {

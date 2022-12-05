@@ -4,8 +4,9 @@ import sys
 import os
 import re
 import json
+from datetime import datetime
 
-SelectPerGroup = 2
+ClientSelectPerGroup = 2
 ConnNumPerServer= 3
 
 # generator.py output.json in1.yaml in2.yaml in....yaml
@@ -55,7 +56,7 @@ def src2group(file):
         return None
     return group
 
-result = { 'selectpergroup': SelectPerGroup, 'groups': []}
+result = {'ver': datetime.now().strftime("%Y%m%d%H%M%S"), 'selectpergroup': ClientSelectPerGroup, 'groups': []}
 
 for f in sys.argv[2:]:
     group = src2group(f)

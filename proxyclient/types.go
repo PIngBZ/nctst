@@ -1,6 +1,8 @@
 package proxyclient
 
 import (
+	"time"
+
 	"github.com/PIngBZ/nctst"
 )
 
@@ -19,6 +21,8 @@ type ProxyInfo struct {
 	Password  string            `json:"password"`
 	ConnNum   int               `json:"connnum"`
 	Params    map[string]string `json:"params"`
+	Ping      uint32            `json:"-"`
+	PingTime  time.Time         `json:"-"`
 }
 
 type ProxyGroup struct {
@@ -27,8 +31,10 @@ type ProxyGroup struct {
 }
 
 type ProxyGroups struct {
-	SelectPerGroup int           `json:"selectpergroup"`
-	Groups         []*ProxyGroup `json:"groups"`
+	Version           string        `json:"ver"`
+	SelectPerGroup    int           `json:"selectpergroup"`
+	ClientTotalSelect int           `json:"clienttotalselect"`
+	Groups            []*ProxyGroup `json:"groups"`
 }
 
 type PingTarget struct {

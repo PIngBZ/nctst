@@ -20,6 +20,8 @@ var (
 	clientUserNameIndex      = make(map[string]*Client)
 	clientsLocker            = sync.Mutex{}
 	nextClientID        uint = uint(rand.Intn(89999) + 10000)
+
+	logoutNotify = make(chan string, 8)
 )
 
 func init() {
@@ -48,6 +50,12 @@ func main() {
 
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	nctst.CheckError(err)
+
+	go func() {
+		for userName := range logoutNotify {
+			doLogout(userName, false)
+		}
+	}()
 
 	for {
 		conn, err := listener.AcceptTCP()
@@ -126,12 +134,12 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 	}
 
 	if !UserMgr.CheckAuthCode(cmd.UserName, cmd.AuthCode) {
-		sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthCode)
+		sendLoginReply(conn, cmd.ClientUUID, 0, "", "", nctst.LoginReply_errAuthCode)
 		return
 	}
 
 	if !UserMgr.CheckUserPassword(cmd.UserName, cmd.PassWord) {
-		sendLoginReply(conn, cmd.ClientUUID, 0, "", nctst.LoginReply_errAuthority)
+		sendLoginReply(conn, cmd.ClientUUID, 0, "", "", nctst.LoginReply_errAuthority)
 		return
 	}
 
@@ -143,24 +151,40 @@ func doLogin(conn *net.TCPConn, command *nctst.Command) {
 		return
 	}
 
-	if client, ok := clientUserNameIndex[cmd.UserName]; ok {
-		client.Close()
-		delete(clients, client.UUID)
-		delete(clientUserNameIndex, cmd.UserName)
-	}
+	doLogout(cmd.UserName, true)
 
 	user, _ := UserMgr.GetUser(cmd.UserName)
 
-	client := NewClient(user, cmd.ClientUUID, nextClientID, cmd.Compress)
+	client := NewClient(user, cmd.ClientUUID, nextClientID, cmd.Compress, logoutNotify)
 	nextClientID++
 	clients[cmd.ClientUUID] = client
 	clientUserNameIndex[cmd.UserName] = client
 
 	clientsLocker.Unlock()
 
-	sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, nctst.LoginReply_success)
+	var pingUrl string
+	if config.AdminListen[0] == ':' {
+		pingUrl = "http://127.0.0.1" + config.AdminListen
+	} else {
+		pingUrl = "http://" + config.AdminListen
+	}
+	pingUrl += "/ping"
+	sendLoginReply(conn, client.UUID, client.ID, client.ConnKey, pingUrl, nctst.LoginReply_success)
 
 	log.Printf("login success %s %s %d\n", client.UUID, cmd.UserName, client.ID)
+}
+
+func doLogout(userName string, locked bool) {
+	if !locked {
+		clientsLocker.Lock()
+		defer clientsLocker.Unlock()
+	}
+
+	if client, ok := clientUserNameIndex[userName]; ok {
+		client.Close()
+		delete(clients, client.UUID)
+		delete(clientUserNameIndex, userName)
+	}
 }
 
 func doHandshake(conn *net.TCPConn, command *nctst.Command) {
@@ -190,12 +214,13 @@ func doHandshake(conn *net.TCPConn, command *nctst.Command) {
 	client.AddConn(conn, cmd.TunnelID, cmd.ConnID)
 }
 
-func sendLoginReply(conn *net.TCPConn, uuid string, id uint, connKey string, code nctst.LoginReply_Code) {
+func sendLoginReply(conn *net.TCPConn, uuid string, id uint, connKey string, pingUrl string, code nctst.LoginReply_Code) {
 	cmd := &nctst.CommandLoginReply{}
 	cmd.ClientID = id
 	cmd.ClientUUID = uuid
 	cmd.ConnectKey = connKey
 	cmd.Code = code
+	cmd.PingURL = pingUrl
 	nctst.SendCommand(conn, &nctst.Command{Type: nctst.Cmd_loginReply, Item: cmd})
 }
 

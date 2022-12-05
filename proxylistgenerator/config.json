@@ -9,6 +9,7 @@
     },
     "selectpergroup": 5,
     "pingthreadnum": 10,
+    "clienttotalselect": 3,
     "publishserver": {
         "host": "",
         "port": 12345

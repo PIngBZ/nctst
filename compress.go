@@ -86,7 +86,7 @@ func (c *CompStream) IsClosed() bool {
 }
 
 func (c *CompStream) daemon() {
-	ticker := time.NewTicker(time.Millisecond * 10)
+	ticker := time.NewTicker(time.Millisecond * 15)
 	for {
 		select {
 		case <-c.die:

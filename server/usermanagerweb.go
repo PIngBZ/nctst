@@ -43,11 +43,13 @@ func (h *UserManager) daemon() {
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(h.basicAuth)
 
-	r.Get("/initdev", h.initAuthDevice)
-	r.Get("/authcode", h.generateAuthCode)
-	r.Post("/updateProxylist", h.upadteProxyList)
-	r.Get("/proxylist", h.proxyList)
-	r.Get("/exit", h.exit)
+	r.Get("/initdev", h.httpInitAuthDevice)
+	r.Get("/authcode", h.httpGenerateAuthCode)
+	r.Get("/checkcode", h.httpCheckAuthCode)
+	r.Post("/updateProxylist", h.httpUpadteProxyList)
+	r.Get("/proxylist", h.httpProxyList)
+	r.Get("/exit", h.httpExit)
+	r.Get("/ping", h.httpPing)
 
 	r.Route("/users", func(r chi.Router) {
 		r.Get("/", h.listUsers)
@@ -61,6 +63,7 @@ func (h *UserManager) daemon() {
 			r.Get("/changepwd", h.changePwd)
 			r.Post("/commitpwd", h.commitPwd)
 			r.Get("/proxy", h.changeProxy)
+			r.Get("/nocodelogin", h.noCodeLogin)
 		})
 	})
 
@@ -86,7 +89,8 @@ func (h *UserManager) basicAuth(next http.Handler) http.Handler {
 
 		if nctst.HashPassword(name, pass) != user.Hash {
 			time.Sleep(time.Second * 5)
-			render.Render(w, r, nctst.ErrForbiddenErrLogin)
+			w.Header().Add("WWW-Authenticate", `Basic realm="Need Login"`)
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 
@@ -126,10 +130,10 @@ func (h *UserManager) targetUserCtx(next http.Handler) http.Handler {
 
 func (h *UserManager) GetUser(username string) (*UserInfo, error) {
 	var id, realName, hash, session string
-	var admin, status, proxy int
+	var admin, status, proxy, noCodeLogin int
 	var lastTime, createTime time.Time
-	cmd := "select id,realname,password,admin,session,lasttime,createtime,status,proxy from userinfo where username=?"
-	if err := DB.QueryRow(cmd, username).Scan(&id, &realName, &hash, &admin, &session, &lastTime, &createTime, &status, &proxy); err != nil {
+	cmd := "select id,realname,password,admin,session,lasttime,createtime,status,proxy,nocodelogin from userinfo where username=?"
+	if err := DB.QueryRow(cmd, username).Scan(&id, &realName, &hash, &admin, &session, &lastTime, &createTime, &status, &proxy, &noCodeLogin); err != nil {
 		return nil, err
 	}
 	user := &UserInfo{}
@@ -143,6 +147,7 @@ func (h *UserManager) GetUser(username string) (*UserInfo, error) {
 	user.CreateTime = createTime
 	user.Status = UserStatus(status)
 	user.Proxy = proxy == 1
+	user.NoCodeLogin = noCodeLogin == 1
 
 	if c, loaded := h.authCodes.Load(username); loaded {
 		user.CodeInfo = c.(*CodeInfo)
@@ -208,9 +213,10 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id, userName, realName, hash string
-	var admin, status, proxy int
+	var admin, status, proxy, noCodeLogin int
 	var lastTime, createTime time.Time
-	cmd := "select id,username,realname,password,admin,lasttime,createtime,status,proxy from userinfo"
+
+	cmd := "select id,username,realname,password,admin,lasttime,createtime,status,proxy,nocodelogin from userinfo"
 	if !login.Admin {
 		cmd += " where id=" + login.ID
 	} else {
@@ -226,7 +232,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 
 	users := make([]*UserInfo, 0)
 	for rows.Next() {
-		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status, &proxy); err != nil {
+		if err = rows.Scan(&id, &userName, &realName, &hash, &admin, &lastTime, &createTime, &status, &proxy, &noCodeLogin); err != nil {
 			render.Render(w, r, nctst.ErrInternal(err))
 			return
 		}
@@ -240,6 +246,7 @@ func (h *UserManager) listUsers(w http.ResponseWriter, r *http.Request) {
 		user.CreateTime = createTime
 		user.Status = UserStatus(status)
 		user.Proxy = proxy == 1
+		user.NoCodeLogin = noCodeLogin == 1
 
 		if dc, ok := hourCounts[userName]; ok {
 			user.TrafficHour.Send = dc.First
@@ -448,11 +455,11 @@ func (h *UserManager) changeProxy(w http.ResponseWriter, r *http.Request) {
 
 	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
 
-	toOpenProxy := 1
+	toOpen := 1
 	if user.Proxy {
-		toOpenProxy = 0
+		toOpen = 0
 	}
-	_, err := DB.Exec("update userinfo set proxy=? where id=?", toOpenProxy, user.ID)
+	_, err := DB.Exec("update userinfo set proxy=? where id=?", toOpen, user.ID)
 	if err != nil {
 		render.Render(w, r, nctst.ErrInternal(err))
 		return
@@ -461,7 +468,28 @@ func (h *UserManager) changeProxy(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/users", http.StatusFound)
 }
 
-func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) noCodeLogin(w http.ResponseWriter, r *http.Request) {
+	if !h.isAdmin(r) {
+		render.Render(w, r, nctst.ErrForbiddenNeedAdmin)
+		return
+	}
+
+	user, _ := r.Context().Value(TargetUserContextKey).(*UserInfo)
+
+	toOpen := 1
+	if user.NoCodeLogin {
+		toOpen = 0
+	}
+	_, err := DB.Exec("update userinfo set nocodelogin=? where id=?", toOpen, user.ID)
+	if err != nil {
+		render.Render(w, r, nctst.ErrInternal(err))
+		return
+	}
+
+	http.Redirect(w, r, "/users", http.StatusFound)
+}
+
+func (h *UserManager) httpGenerateAuthCode(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
 
 	r.ParseForm()
@@ -481,13 +509,35 @@ func (h *UserManager) generateAuthCode(w http.ResponseWriter, r *http.Request) {
 		}
 
 		seconds := int(time.Until(info.Time.Add(time.Second*60)) / time.Second)
-		nctst.WriteResponse(w, &nctst.CodeResponse{AuthCode: info.Code, Seconds: seconds})
+		nctst.WriteSuccessResponse(w, &nctst.CodeResponse{AuthCode: info.Code, Seconds: seconds})
 	} else {
-		nctst.WriteResponse(w, &nctst.CodeResponse{AuthCode: newCode.Code, Seconds: 60})
+		nctst.WriteSuccessResponse(w, &nctst.CodeResponse{AuthCode: newCode.Code, Seconds: 60})
 	}
 }
 
-func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) httpCheckAuthCode(w http.ResponseWriter, r *http.Request) {
+	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
+
+	r.ParseForm()
+	codeS := r.Form.Get("code")
+	if codeS == "" {
+		render.Render(w, r, nctst.ErrInvalidRequest(errors.New("error params")))
+		return
+	}
+	code, err := strconv.Atoi(codeS)
+	if err != nil {
+		render.Render(w, r, nctst.ErrInvalidRequest(err))
+		return
+	}
+
+	if h.CheckAuthCode(user.UserName, code) {
+		nctst.WriteSuccessResponse(w, nil)
+	} else {
+		nctst.WriteErrorResponse(w, "error code")
+	}
+}
+
+func (h *UserManager) httpInitAuthDevice(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
 	r.ParseForm()
 
@@ -523,15 +573,15 @@ func (h *UserManager) initAuthDevice(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		nctst.WriteResponse(w, &nctst.InitResponse{Session: session})
+		nctst.WriteSuccessResponse(w, &nctst.InitResponse{Session: session})
 	}
 }
 
-func (h *UserManager) exit(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) httpExit(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "exit success", http.StatusUnauthorized)
 }
 
-func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) httpUpadteProxyList(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
@@ -573,7 +623,7 @@ func (h *UserManager) upadteProxyList(w http.ResponseWriter, r *http.Request) {
 	os.WriteFile("proxydata/current.json", proxyGroupsData, 0600)
 	os.WriteFile(fmt.Sprintf("proxydata/%s.json", time.Now().Format("20060102150405")), proxyGroupsData, 0600)
 
-	nctst.WriteResponse(w, &nctst.APIResponse{Code: nctst.APIResponseCode_Success, StatusText: "success"})
+	nctst.WriteSuccessResponse(w, nil)
 }
 
 func loadProxyGroupData() {
@@ -599,7 +649,7 @@ func loadProxyGroupData() {
 	log.Println("loadProxyGroupData success")
 }
 
-func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {
+func (h *UserManager) httpProxyList(w http.ResponseWriter, r *http.Request) {
 	user, _ := r.Context().Value(LoginUserContextKey).(*UserInfo)
 
 	if len(proxyGroupsData) == 0 {
@@ -614,4 +664,10 @@ func (h *UserManager) proxyList(w http.ResponseWriter, r *http.Request) {
 	nctst.Xor(buf.Data()[4:], []byte(user.UserName))
 
 	w.Write(buf.Data())
+}
+
+func (h *UserManager) httpPing(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	t := r.Form.Get("t")
+	w.Write([]byte(t))
 }

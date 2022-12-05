@@ -8,15 +8,16 @@ import (
 )
 
 type Config struct {
-	Key            string          `json:"key"`
-	UserName       string          `json:"username"`
-	Password       string          `json:"password"`
-	SrcFile        string          `json:"srcfile"`
-	Target         *nctst.AddrInfo `json:"target"`
-	SelectPerGroup int             `json:"selectpergroup"`
-	PingThreadNum  int             `json:"pingthreadnum"`
-	PublishServer  *nctst.AddrInfo `json:"publishserver"`
-	PublishTimeout int             `json:"publishtimeout"`
+	Key               string          `json:"key"`
+	UserName          string          `json:"username"`
+	PassWord          string          `json:"password"`
+	SrcFile           string          `json:"srcfile"`
+	Target            *nctst.AddrInfo `json:"target"`
+	SelectPerGroup    int             `json:"selectpergroup"`
+	ClientTotalSelect int             `json:"clienttotalselect"`
+	PingThreadNum     int             `json:"pingthreadnum"`
+	PublishServer     *nctst.AddrInfo `json:"publishserver"`
+	PublishTimeout    int             `json:"publishtimeout"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

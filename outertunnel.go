@@ -27,6 +27,8 @@ type OuterTunnel struct {
 	sendChan    chan *BufItem
 	outputChan  chan *BufItem
 
+	logoutNotify chan string
+
 	DirectChan chan *BufItem
 
 	CommandManager *CommandManager
@@ -36,7 +38,7 @@ type OuterTunnel struct {
 	dieOnce sync.Once
 }
 
-func NewOuterTunnel(key string, id uint, clientID uint, receiveChan chan *BufItem, sendChan chan *BufItem) *OuterTunnel {
+func NewOuterTunnel(key string, id uint, clientID uint, receiveChan chan *BufItem, sendChan chan *BufItem, logoutNotify chan string) *OuterTunnel {
 	h := &OuterTunnel{}
 	h.ID = id
 	h.ClientID = clientID
@@ -49,6 +51,8 @@ func NewOuterTunnel(key string, id uint, clientID uint, receiveChan chan *BufIte
 	h.sendChan = sendChan
 	h.outputChan = make(chan *BufItem)
 	h.DirectChan = make(chan *BufItem)
+
+	h.logoutNotify = logoutNotify
 
 	h.CommandManager = NewCommandManager()
 
@@ -82,11 +86,24 @@ func (h *OuterTunnel) Close() {
 	log.Printf("OuterTunnel.Close %d %d\n", h.ClientID, h.ID)
 }
 
+func (c *OuterTunnel) IsClosed() bool {
+	select {
+	case <-c.Die:
+		return true
+	default:
+		return false
+	}
+}
+
 func (h *OuterTunnel) AddConn(conn io.ReadWriteCloser, id uint) (outerConn *OuterConnection) {
 	h.RemoveConn(id)
 
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
+
+	if h.IsClosed() {
+		return
+	}
 
 	outer := NewOuterConnection(h.ClientID, h.ID, id, conn, h.receiveChan, h.outputChan, h.commandSendChan, h.CommandManager.CommandReceiveChan)
 	h.connections[id] = outer
@@ -98,6 +115,10 @@ func (h *OuterTunnel) RemoveConn(id uint) {
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
 
+	if h.IsClosed() {
+		return
+	}
+
 	if outer, ok := h.connections[id]; ok {
 		delete(h.connections, id)
 		outer.Close()
@@ -107,6 +128,10 @@ func (h *OuterTunnel) RemoveConn(id uint) {
 func (h *OuterTunnel) RemoveAllConn() {
 	h.connectionsLocker.Lock()
 	defer h.connectionsLocker.Unlock()
+
+	if h.IsClosed() {
+		return
+	}
 
 	for _, v := range h.connections {
 		v.Close()
@@ -134,7 +159,7 @@ func (h *OuterTunnel) transferLoop() {
 
 func (h *OuterTunnel) daemon() {
 	for {
-		ticker := time.NewTicker(time.Second * time.Duration(rand.Intn(15)+15))
+		ticker := time.NewTicker(time.Second * time.Duration(rand.Intn(60)+60))
 		select {
 		case <-h.Die:
 			return
@@ -155,11 +180,10 @@ func (h *OuterTunnel) startPing() {
 	h.nextPingID++
 	cmd.SendTime = time.Now().UnixNano() / 1e6
 
-	log.Printf("Ping: %d %d %d\n", cmd.ClientID, cmd.TunnelID, cmd.ID)
-	h.sendCommand(&Command{Type: Cmd_ping, Item: cmd})
+	h.SendCommand(&Command{Type: Cmd_ping, Item: cmd})
 }
 
-func (h *OuterTunnel) sendCommand(command *Command) {
+func (h *OuterTunnel) SendCommand(command *Command) {
 	select {
 	case <-h.Die:
 		return
@@ -172,6 +196,8 @@ func (h *OuterTunnel) onReceiveCommand(command *Command) {
 	switch command.Type {
 	case Cmd_ping:
 		h.onReceivePing(command.Item.(*CommandPing))
+	case Cmd_logout:
+		h.logoutNotify <- command.Item.(*CommandLogout).UserName
 	}
 }
 
@@ -183,9 +209,9 @@ func (h *OuterTunnel) onReceivePing(ping *CommandPing) {
 	switch ping.Step {
 	case 1:
 		ping.Step = 2
-		h.sendCommand(&Command{Type: Cmd_ping, Item: ping})
+		h.SendCommand(&Command{Type: Cmd_ping, Item: ping})
 	case 2:
 		h.Ping = time.Now().UnixNano()/1e6 - ping.SendTime
-		log.Printf("updatePing: client %d tunnel %d id %d ping %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
+		log.Printf("Ping: client %d tunnel %d id %d ping %d\n", ping.ClientID, ping.TunnelID, ping.ID, h.Ping)
 	}
 }
