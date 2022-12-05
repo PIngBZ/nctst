@@ -7,37 +7,10 @@
         "host": "127.0.0.1",
         "port": 8000
     },
-    "proxies": [
-        {
-            "type": "socks5",
-            "name": "",
-            "host": "127.0.0.1",
-            "port": 8889,
-            "connnum": 3
-        }, {
-            "type": "trojan",
-            "name": "",
-            "host": "127.0.0.1",
-            "port": 8889,
-            "loginname": "",
-            "password": "",
-            "connnum": 3
-        }, {
-            "type": "ssr",
-            "name": "",
-            "host": "127.0.0.1",
-            "port": 8889,
-            "password": "",
-            "params": {
-                "cipher": "",
-                "obfs": "",
-                "obfs-param": "",
-                "protocol": "",
-                "protocol-param": ""
-            },
-            "connnum": 3
-        }
-    ],
+    "manager": {
+        "host": "127.0.0.1",
+        "port": 9000
+    },
     "proxyfile": {
         "_Remark": "type: file/net(url: x.x.x.x:xxx)",
         "type": "file",
@@ -55,5 +28,7 @@
         }
     ],
     "compress": true,
-    "key": "123"
+    "key": "123",
+    "tunip": "192.168.123.1/32",
+    "tunroute": "192.168.5.1/24"
 }

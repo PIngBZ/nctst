@@ -48,9 +48,10 @@ func main() {
 	proxyInfo := proxyclient.GetProxyListFromFile(fileInfo)
 
 	for _, group := range proxyInfo.Groups {
-		proxylist := proxyclient.SelectProxyFromGroup(group, config.SelectPerGroup, pingTarget, true)
+		proxylist := proxyclient.PingSelectProxyFromList(group.List, config.SelectPerGroup, pingTarget, true)
 		group.List = proxylist
 	}
+	proxyInfo.ClientTotalSelect = config.ClientTotalSelect
 
 	buf, err := json.Marshal(proxyInfo)
 	if err != nil {
@@ -77,7 +78,7 @@ func main() {
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.SetBasicAuth(config.UserName, config.Password)
+	req.SetBasicAuth(config.UserName, config.PassWord)
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -86,14 +87,14 @@ func main() {
 	}
 	defer response.Body.Close()
 
-	ret, err := io.ReadAll(response.Body)
-	if err != nil {
-		log.Printf("ReadAll %+v\n", err)
+	if response.StatusCode != 200 {
+		log.Printf("Error, StatusCode = %d\n", response.StatusCode)
 		return
 	}
 
-	if response.StatusCode != 200 {
-		log.Printf("Error, StatusCode = %d\n%s\n", response.StatusCode, string(ret))
+	ret, err := io.ReadAll(response.Body)
+	if err != nil {
+		log.Printf("ReadAll %+v\n", err)
 		return
 	}
 

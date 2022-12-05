@@ -1,11 +1,16 @@
 {
     "_Remark": "this is a demo",
-    "selectpergroup": 2,
+    "selectpergroup": 5,
+    "clienttotalselect": 3,
     "groups": [
         {
             "name": "aa",
             "list": [
                 {
+                    "type": "direct",
+                    "connnum": 3
+                }
+                , {
                     "type": "socks5",
                     "name": "",
                     "host": "127.0.0.1",

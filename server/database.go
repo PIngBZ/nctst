@@ -12,7 +12,7 @@ import (
 
 var (
 	DB               *sql.DB
-	CurrentDBVersion = 100
+	CurrentDBVersion = 101
 )
 
 func init() {
@@ -87,6 +87,9 @@ func upgradeDatabase() {
 		case ver < 100:
 			upgrade100()
 			fallthrough
+		case ver < 101:
+			upgrade101()
+			fallthrough
 		default:
 		}
 
@@ -98,5 +101,10 @@ func upgradeDatabase() {
 
 func upgrade100() {
 	_, err := DB.Exec("alter table userinfo add column proxy INTEGER DEFAULT 0")
+	nctst.CheckError(err)
+}
+
+func upgrade101() {
+	_, err := DB.Exec("alter table userinfo add column nocodelogin INTEGER DEFAULT 0")
 	nctst.CheckError(err)
 }

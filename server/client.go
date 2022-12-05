@@ -32,6 +32,8 @@ type Client struct {
 	tunnelsLocker  sync.Mutex
 	tunnelsListVer uint32
 
+	logoutNotify chan string
+
 	receiveCounter atomic.Int64
 	sendCounter    atomic.Int64
 
@@ -39,7 +41,7 @@ type Client struct {
 	dieOnce sync.Once
 }
 
-func NewClient(user *UserInfo, uuid string, id uint, compress bool) *Client {
+func NewClient(user *UserInfo, uuid string, id uint, compress bool, logoutNotify chan string) *Client {
 	h := &Client{}
 	h.User = user
 	h.UUID = uuid
@@ -47,6 +49,7 @@ func NewClient(user *UserInfo, uuid string, id uint, compress bool) *Client {
 	k := md5.Sum([]byte(uuid))
 	h.ConnKey = hex.EncodeToString(k[:])
 	h.die = make(chan struct{})
+	h.logoutNotify = logoutNotify
 
 	go h.saveCountLoop()
 
@@ -127,7 +130,7 @@ func (h *Client) AddConn(conn *net.TCPConn, tunnelID uint, connID uint) {
 	h.tunnelsLocker.Lock()
 	tunnel, ok := h.tunnels[tunnelID]
 	if !ok {
-		tunnel = nctst.NewOuterTunnel(config.Key, tunnelID, h.ID, h.kcp.InputChan, h.duplicater.Output)
+		tunnel = nctst.NewOuterTunnel(config.Key, tunnelID, h.ID, h.kcp.InputChan, h.duplicater.Output, h.logoutNotify)
 		h.tunnels[tunnelID] = tunnel
 		atomic.AddUint32(&h.tunnelsListVer, 1)
 	}

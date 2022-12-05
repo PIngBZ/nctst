@@ -11,7 +11,7 @@
         .table-columnw3{display:table-column;width:90px;}  
         .table-columnw4{display:table-column;width:120px;}  
         .table-columnw5{display:table-column;width:150px;}  
-        .table-columnw6{display:table-column;width:200px;}  
+        .table-columnw6{display:table-column;width:180px;}  
         .table-row-group{display:table-row-group;}  
         .table-row{display:table-row;}  
         .table-row-group .table-row:hover,.table-footer-group .table-row:hover{background:#f6f6f6;}  
@@ -28,16 +28,17 @@
     <div class="table">
         <div class="table-column-group">
             <div class="table-columnw1"></div>
-            <div class="table-columnw3"></div>
-            <div class="table-columnw4"></div>
+            <div class="table-columnw2"></div>
+            <div class="table-columnw2"></div>
             <div class="table-columnw4"></div>
             <div class="table-columnw4"></div>
             <div class="table-columnw3"></div>
             {{if .Me.Admin}}
+            <div class="table-columnw2"></div>
+            <div class="table-columnw2"></div>
             <div class="table-columnw3"></div>
-            <div class="table-columnw3"></div>
-            <div class="table-columnw4"></div>
-            <div class="table-columnw3"></div>
+            <div class="table-columnw2"></div>
+            <div class="table-columnw2"></div>
             <div class="table-columnw1"></div>
             {{end}}
             <div class="table-columnw6"></div>
@@ -63,6 +64,7 @@
 
                 {{if .Me.Admin}}
                 <li class="table-cell">PROXY</li>
+                <li class="table-cell">NOCODE</li>
                 <li class="table-cell">DEL</li>
                 {{end}}
                 <li class="table-cell">HourlyTraffic</li>
@@ -111,6 +113,12 @@
                         {{.Proxy}}
                         {{if ne .UserName "admin"}}
                         [<a href="/users/{{.UserName}}/proxy">change</a>]
+                        {{end}}
+                    </li>
+                    <li class="table-cell">
+                        {{.NoCodeLogin}}
+                        {{if ne .UserName "admin"}}
+                        [<a href="/users/{{.UserName}}/nocodelogin">change</a>]
                         {{end}}
                     </li>
                     <li class="table-cell">

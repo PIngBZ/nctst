@@ -1,7 +1,6 @@
 package proxyclient
 
 import (
-	"io"
 	"net/url"
 
 	"github.com/PIngBZ/nctst"
@@ -77,32 +76,4 @@ func (h *SSRClient) Connect() error {
 
 	h.Conn = ssrconn
 	return nil
-}
-
-func (h *SSRClient) Write(p []byte) (int, error) {
-	if h.Conn == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	n, err := h.Conn.Write(p)
-	return n, err
-}
-
-func (h *SSRClient) Read(p []byte) (int, error) {
-	if h.Conn == nil {
-		return 0, io.ErrClosedPipe
-	}
-
-	n, err := h.Conn.Read(p)
-	return n, err
-}
-
-func (h *SSRClient) Close() error {
-	if h.Conn == nil {
-		return nil
-	}
-
-	err := h.Conn.Close()
-	h.Conn = nil
-	return err
 }

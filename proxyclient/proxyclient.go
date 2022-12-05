@@ -26,6 +26,8 @@ func NewProxyClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
 		return NewTrojanClient(server, target)
 	} else if server.Type == "ssr" {
 		return NewSSRClient(server, target)
+	} else if server.Type == "direct" {
+		return NewDirectClient(server, target)
 	} else {
 		log.Println("unknown proxy type: " + server.Type)
 		return nil
@@ -37,8 +39,7 @@ type proxyClient struct {
 
 	Target *nctst.AddrInfo
 
-	Conn     net.Conn
-	TestPing uint32
+	Conn net.Conn
 }
 
 func (h *proxyClient) LocalAddr() net.Addr {
@@ -74,7 +75,7 @@ func (h *proxyClient) SetWriteDeadline(t time.Time) error {
 }
 
 func (h *proxyClient) LastPing() uint32 {
-	return h.TestPing
+	return h.Server.Ping
 }
 
 func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(ProxyClient, uint32, error)) bool {
@@ -85,7 +86,8 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 	}
 
 	var h = self
-	hh.TestPing = 100000
+	hh.Server.Ping = 100000
+	hh.Server.PingTime = time.Now()
 
 	defer h.Close()
 
@@ -170,11 +172,39 @@ func (hh *proxyClient) Ping(self ProxyClient, printDetails bool, finished func(P
 
 	ping := uint32(time.Now().UnixNano()/1e6 - ret.SendTime)
 
-	hh.TestPing = ping
+	hh.Server.Ping = ping
 	printf("PingResult %s %d\n", hh.Server.Address(), ping)
 	if finished != nil {
 		finished(h, ping, nil)
 	}
 
 	return true
+}
+
+func (h *proxyClient) Write(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
+	n, err := h.Conn.Write(p)
+	return n, err
+}
+
+func (h *proxyClient) Read(p []byte) (int, error) {
+	if h.Conn == nil {
+		return 0, io.ErrClosedPipe
+	}
+
+	n, err := h.Conn.Read(p)
+	return n, err
+}
+
+func (h *proxyClient) Close() error {
+	if h.Conn == nil {
+		return nil
+	}
+
+	err := h.Conn.Close()
+	h.Conn = nil
+	return err
 }

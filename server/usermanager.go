@@ -34,17 +34,18 @@ func (h *TrafficCountInfo) FormatSReceive() string {
 }
 
 type UserInfo struct {
-	ID         string
-	UserName   string
-	RealName   string
-	Hash       string
-	Admin      bool
-	Session    string
-	LastTime   time.Time
-	CreateTime time.Time
-	Status     UserStatus
-	CodeInfo   *CodeInfo
-	Proxy      bool
+	ID          string
+	UserName    string
+	RealName    string
+	Hash        string
+	Admin       bool
+	Session     string
+	LastTime    time.Time
+	CreateTime  time.Time
+	Status      UserStatus
+	CodeInfo    *CodeInfo
+	Proxy       bool
+	NoCodeLogin bool
 
 	TrafficHour  TrafficCountInfo
 	TrafficDay   TrafficCountInfo
@@ -79,7 +80,11 @@ func (h *UserManager) CheckAuthCode(username string, code int) bool {
 		return true
 	}
 
-	if c, ok := h.authCodes.Load(username); ok {
+	if user, err := h.GetUser(username); err != nil {
+		return false
+	} else if user.NoCodeLogin {
+		return true
+	} else if c, ok := h.authCodes.Load(username); ok {
 		info := c.(*CodeInfo)
 		if info.Time.Add(time.Second * 65).Before(time.Now()) {
 			h.authCodes.Delete(username)

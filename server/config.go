@@ -15,6 +15,8 @@ type Config struct {
 	AdminListen   string `json:"adminlisten"`
 	AdminPassword string `json:"adminpwd"`
 	Test          bool   `json:"test"`
+
+	PingUrl string
 }
 
 func parseConfig(configFile string) (*Config, error) {
@@ -29,6 +31,14 @@ func parseConfig(configFile string) (*Config, error) {
 	if err := json.NewDecoder(file).Decode(cfg); err != nil {
 		return nil, err
 	}
+
+	var pingUrl string
+	if cfg.AdminListen[0] == ':' {
+		pingUrl = "http://127.0.0.1" + cfg.AdminListen
+	} else {
+		pingUrl = "http://" + cfg.AdminListen
+	}
+	cfg.PingUrl = pingUrl + "/ping"
 
 	return cfg, nil
 }

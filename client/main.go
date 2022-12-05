@@ -5,29 +5,19 @@ import (
 	"flag"
 	"log"
 	"math/rand"
-	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/PIngBZ/nctst"
-	"github.com/PIngBZ/nctst/proxyclient"
-	"github.com/google/uuid"
-	"github.com/xtaci/smux"
+	"github.com/PIngBZ/nctst/client/core"
 )
 
 var (
-	UUID     = uuid.NewString()
-	ClientID uint
-
 	authCode   int
 	configFile string
-	config     *Config
-
-	kcp        *nctst.Kcp
-	proxies    = []*Proxy{}
-	tunnels    = make([]*nctst.OuterTunnel, 0)
-	duplicater *nctst.Duplicater
-
-	connKey string
+	config     *core.Config
 )
 
 func init() {
@@ -51,90 +41,16 @@ func init() {
 	}
 
 	var err error
-	config, err = parseConfig(configFile)
+	config, err = core.ParseConfig(configFile)
 	nctst.CheckError(err)
 
 	nctst.CommandXorKey = config.Key
 }
 
 func main() {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", config.Listen)
-	nctst.CheckError(err)
+	nctst.CheckError(core.Start(config, authCode))
 
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	nctst.CheckError(err)
-
-	proxyList := requestProxyList()
-	if len(proxyList) == 0 {
-		nctst.CheckError(errors.New("no proxy server"))
-	}
-
-	WaittingLogin(proxyList)
-
-	kcp = nctst.NewKcp(ClientID)
-	duplicater = nctst.NewDuplicater(kcp.OutputChan, func(v uint32) (uint32, []*nctst.OuterTunnel) { return 100, tunnels })
-
-	var smuxClient *smux.Session
-	if config.Compress {
-		smuxClient, err = smux.Client(nctst.NewCompStream(kcp), nctst.SmuxConfig())
-	} else {
-		smuxClient, err = smux.Client(kcp, nctst.SmuxConfig())
-	}
-	nctst.CheckError(err)
-
-	startUpstreamProxies(proxyList)
-
-	startMapTargetsLoop(smuxClient, config.MapTargets)
-
-	log.Printf("Start finished, socks5 listening: %s\n\n", config.Listen)
-
-	for {
-		conn, err := listener.AcceptTCP()
-		if err != nil {
-			log.Printf("main AcceptTCP: %+v\n", err)
-			continue
-		}
-
-		log.Printf("main AcceptTCP %s\n", conn.RemoteAddr().String())
-
-		go doTransfer(conn, smuxClient)
-	}
-}
-
-func doTransfer(conn *net.TCPConn, smuxClient *smux.Session) {
-	stream, err := smuxClient.OpenStream()
-	if err != nil {
-		conn.Close()
-		log.Printf("main doTransfer OpenStream: %+v\n", err)
-		return
-	}
-
-	conn.SetDeadline(time.Time{})
-	stream.SetDeadline(time.Time{})
-
-	log.Printf("main doTransfer Transfer %s\n", conn.RemoteAddr().String())
-	go nctst.Transfer(conn, stream)
-}
-
-func requestProxyList() []*proxyclient.ProxyInfo {
-	var proxyList []*proxyclient.ProxyInfo
-	if len(config.Proxies) != 0 {
-		proxyList = config.Proxies
-		log.Printf("found %d items from config.Proxies\n", len(proxyList))
-	}
-
-	if config.ProxyFile != nil {
-		serverList := proxyclient.GetProxyList(config.ProxyFile, &proxyclient.PingTarget{Target: config.Server, PingThreads: 5}, config.Key, config.UserName, config.PassWord)
-		proxyList = append(proxyList, serverList...)
-		log.Printf("**Found %d items from server %s\n", len(serverList), config.ProxyFile.Url)
-	}
-
-	return proxyList
-}
-
-func startUpstreamProxies(proxyList []*proxyclient.ProxyInfo) {
-	proxies = make([]*Proxy, len(proxyList))
-	for i, p := range proxyList {
-		proxies[i] = NewProxy(uint(i), p)
-	}
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
 }
