@@ -83,6 +83,8 @@ func Start(cfg *Config, code int) error {
 	Status.setStat(ClientStatusStep_StartMapLocal)
 	startMapTargetsLoop(smuxClient, config.MapTargets)
 
+	time.Sleep(time.Second * 3)
+
 	Status.setStat(ClientStatusStep_StartLocalService)
 	tcpAddr, err := net.ResolveTCPAddr("tcp", config.Listen)
 	if err != nil {
@@ -211,7 +213,7 @@ func CheckConnection() (error, int) {
 				return url.Parse(proxy)
 			},
 		},
-		Timeout: time.Second * 15,
+		Timeout: time.Second * 5,
 	}
 
 	start := time.Now().UnixNano()

@@ -54,8 +54,6 @@ func (h *Duplicater) daemon() {
 			return
 		case item := <-h.input:
 			h.updateTunnelsList()
-
-			item.SetMetaData(item.Size())
 		out:
 			for item.Size() < 256 {
 				select {

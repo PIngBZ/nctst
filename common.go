@@ -146,6 +146,10 @@ func ToUint(data []byte) uint32 {
 	return binary.BigEndian.Uint32(data)
 }
 
+func ToUint64(data []byte) uint64 {
+	return binary.BigEndian.Uint64(data)
+}
+
 func WriteData(writer io.Writer, data []byte) (int, error) {
 	var err error
 	var written int
@@ -199,6 +203,17 @@ func WriteUInt(writer io.Writer, n uint32) error {
 	if n, err := writer.Write(buf[:]); err != nil {
 		return err
 	} else if n != 4 {
+		return io.ErrShortWrite
+	}
+	return nil
+}
+
+func WriteUInt64(writer io.Writer, n uint64) error {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], n)
+	if n, err := writer.Write(buf[:]); err != nil {
+		return err
+	} else if n != 8 {
 		return io.ErrShortWrite
 	}
 	return nil

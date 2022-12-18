@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	commandSignHeader uint32 = 0xf1f121
+	commandSignHeader uint64 = 0xf1f121e1e1e1
 )
 
 var (
@@ -138,11 +138,11 @@ func SendCommand(conn io.Writer, command *Command) error {
 	data := []byte(js)
 	Xor(data, []byte(CommandXorKey))
 
-	if err := WriteUInt(conn, uint32(len(data)+8)); err != nil {
+	if err := WriteUInt(conn, uint32(len(data)+12)); err != nil {
 		return err
 	}
 
-	if err := WriteUInt(conn, commandSignHeader); err != nil {
+	if err := WriteUInt64(conn, commandSignHeader); err != nil {
 		return err
 	}
 
@@ -158,13 +158,13 @@ func SendCommand(conn io.Writer, command *Command) error {
 }
 
 func IsCommand(buf *BufItem) bool {
-	if buf.Size() < 16 {
+	if buf.Size() < 20 {
 		return false
 	}
-	if ToUint(buf.Data()[:4]) != commandSignHeader {
+	if ToUint64(buf.Data()[:8]) != commandSignHeader {
 		return false
 	}
-	if ToUint(buf.Data()[4:8]) >= uint32(Cmd_max) {
+	if ToUint(buf.Data()[8:12]) >= uint32(Cmd_max) {
 		return false
 	}
 	return true
@@ -175,7 +175,7 @@ func GetCommandType(buf *BufItem) CommandType {
 		return Cmd_none
 	}
 
-	t := ToUint(buf.Data()[4:8])
+	t := ToUint(buf.Data()[8:12])
 
 	if t >= uint32(Cmd_max) {
 		return Cmd_none
@@ -184,7 +184,7 @@ func GetCommandType(buf *BufItem) CommandType {
 }
 
 func ReadCommand(buf *BufItem) (*Command, error) {
-	if sign, _ := ReadUInt(buf); sign != commandSignHeader {
+	if sign, _ := ReadUInt64(buf); sign != commandSignHeader {
 		return nil, fmt.Errorf("CommandSignHeader error %d", sign)
 	}
 

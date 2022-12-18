@@ -1,7 +1,6 @@
 package nctst
 
 import (
-	"encoding/binary"
 	"io"
 	"log"
 	"net"
@@ -127,10 +126,9 @@ func (h *Kcp) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 
 func (h *Kcp) WriteTo(p []byte, addr net.Addr) (n int, err error) {
 	buf := DataBufPool.Get()
-	var ubuf [4]byte
-	binary.BigEndian.PutUint32(ubuf[:], h.nextPackageID)
+	WriteUInt(buf, uint32(len(p)+4))
+	WriteUInt(buf, h.nextPackageID)
 	h.nextPackageID++
-	buf.AddSize(8)
 	buf.AppendBytes(p)
 	h.OutputChan <- buf
 	return len(p), nil

@@ -88,11 +88,7 @@ func initMainWindow() {
 
 	if desk, ok := App.(desktop.App); ok {
 		mainWindowVisible := true
-
-		var showHide = "显示窗口"
-		if !mainWindowVisible {
-			showHide = "隐藏窗口"
-		}
+		showHide := "隐藏窗口"
 
 		item := fyne.NewMenuItem(showHide, nil)
 		menu := fyne.NewMenu("nctst", item)

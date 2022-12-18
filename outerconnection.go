@@ -116,15 +116,6 @@ func (h *OuterConnection) sendLoop(conn io.ReadWriteCloser, once *sync.Once) {
 		case <-h.Die:
 			return
 		case buf := <-h.sendChan:
-			headLen := buf.Size()
-			if meta := buf.MetaData(); meta != nil {
-				headLen = meta.(int)
-			}
-			if err := WriteUInt(conn, uint32(headLen)); err != nil {
-				buf.Release()
-				log.Printf("sendLoop WriteUInt error: %d %d %d %+v\n", h.ClientID, h.TunnelID, h.ID, err)
-				return
-			}
 			_, err := conn.Write(buf.Data())
 			buf.Release()
 			if err != nil {

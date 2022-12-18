@@ -145,7 +145,7 @@ func PingSelectProxyFromList(input []*ProxyInfo, num int, pingTarget *PingTarget
 		go func() {
 			for work := range workChan {
 				client := NewProxyClient(work, pingTarget.Target)
-				if client.Ping(client, true, nil) {
+				if client.Ping(client, printDetails, nil) {
 					pingResultChan <- work
 				}
 				waitGroup.Done()
