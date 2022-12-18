@@ -12,7 +12,7 @@ type DirectClient struct {
 }
 
 func NewDirectClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
-	h := &Socks5Client{}
+	h := &DirectClient{}
 	h.Server = server
 	h.Target = target
 	return h
@@ -23,8 +23,7 @@ func (h *DirectClient) Connect() error {
 		h.Conn.Close()
 		h.Conn = nil
 	}
-
-	conn, err := net.DialTimeout("tcp", h.Target.Address(), time.Second*5)
+	conn, err := net.DialTimeout("tcp", h.Server.Address(), time.Second*5)
 	if err != nil {
 		return err
 	}

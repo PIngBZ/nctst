@@ -1,0 +1,28 @@
+{
+    "_Remark": "tcp",
+    "selectpergroup": 1,
+    "clienttotalselect": 1,
+    "groups": [
+        {
+            "name": "tcp1",
+            "list": [
+                {
+                    "type": "direct",
+                    "connnum": 3,
+                    "host": "192.168.100.129",
+                    "port": 8000
+                }
+            ]
+        }, {
+            "name": "tcp2",
+            "list":  [
+                {
+                    "type": "direct",
+                    "connnum": 3,
+                    "host": "192.168.100.129",
+                    "port": 8000
+                }
+            ]
+        }
+    ]
+}

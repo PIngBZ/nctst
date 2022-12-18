@@ -27,6 +27,7 @@ func NewTrojanClient(server *ProxyInfo, target *nctst.AddrInfo) ProxyClient {
 }
 
 func (h *TrojanClient) Connect() error {
+
 	h.Close()
 	h.headerWritten = false
 

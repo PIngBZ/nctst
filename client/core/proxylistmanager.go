@@ -28,8 +28,8 @@ type ProxyListManager struct {
 func NewProxyListManager() *ProxyListManager {
 	h := &ProxyListManager{}
 
-	h.AllIdx = mapset.NewThreadUnsafeSet[string]()
-	h.UsingIdx = mapset.NewThreadUnsafeSet[string]()
+	h.AllIdx = mapset.NewSet[string]()
+	h.UsingIdx = mapset.NewSet[string]()
 
 	h.die = make(chan struct{})
 	return h
@@ -40,7 +40,9 @@ func (h *ProxyListManager) Init() error {
 		return err
 	}
 
-	go h.daemon()
+	if config.ProxyFile.Type == "net" {
+		go h.daemon()
+	}
 
 	return nil
 }
@@ -50,19 +52,25 @@ func (h *ProxyListManager) requestProxyList() (error, bool) {
 		return errors.New("no proxy config"), false
 	}
 
-	h.Locker.Lock()
-	defer h.Locker.Unlock()
-
 	SelectNum, All, version := proxyclient.GetProxyList(config.ProxyFile, &proxyclient.PingTarget{Target: config.Server, PingThreads: 5}, config.Key, config.UserName, config.PassWord)
-	if len(version) != 0 && version == h.version {
-		log.Println("no new version proxy list")
-		return nil, false
+
+	if len(All) == 0 {
+		return errors.New("GetProxyList return empty"), false
 	}
+
+	if config.ProxyFile.Type == "net" && version == h.version {
+		return errors.New("no new version proxy list"), false
+	}
+
 	log.Printf("**Found %d items from server %s\n", len(All), config.ProxyFile.Url)
 
 	if len(All) == 0 || SelectNum == 0 {
-		return errors.New("GetProxyList return 0"), false
+		return errors.New("GetProxyList return too small"), false
 	}
+
+	h.Locker.Lock()
+	defer h.Locker.Unlock()
+
 	h.All = All
 	h.SelectNum = nctst.Min(len(All), SelectNum)
 
@@ -105,13 +113,18 @@ func (h *ProxyListManager) Put(proxy *proxyclient.ProxyInfo) {
 
 	h.UsingIdx.Remove(proxy.Address())
 
-	if h.AllIdx.Contains(proxy.Address()) && proxy.PingTime.Add(time.Minute*15).Before(time.Now()) {
-		client := proxyclient.NewProxyClient(proxy, config.Server)
-		client.Ping(client, false, nil)
+	if h.AllIdx.Contains(proxy.Address()) && proxy.PingTime.Add(time.Hour).Before(time.Now()) {
+		go func() {
+			client := proxyclient.NewProxyClient(proxy, config.Server)
+			client.Ping(client, false, nil)
 
-		sort.SliceStable(h.All, func(i, j int) bool {
-			return h.All[i].Ping < h.All[j].Ping
-		})
+			h.Locker.Lock()
+			defer h.Locker.Unlock()
+
+			sort.SliceStable(h.All, func(i, j int) bool {
+				return h.All[i].Ping < h.All[j].Ping
+			})
+		}()
 	}
 }
 

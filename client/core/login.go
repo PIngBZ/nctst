@@ -36,8 +36,8 @@ func WaittingLogin() error {
 			log.Printf("try login failed %s %+v\n", p.Host, err)
 		}
 
-		log.Println("wait 5s to retry ...")
-		time.Sleep(time.Second * 5)
+		log.Println("wait 5s to try login through another proxy ...")
+		time.Sleep(time.Second * 3)
 	}
 	log.Println("all proxies login failed")
 	return errors.New("all proxies login failed")

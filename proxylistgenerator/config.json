@@ -14,5 +14,6 @@
         "host": "",
         "port": 12345
     },
-    "publishtimeout": 10
+    "publishtimeout": 30,
+    "publishretry": 3
 }

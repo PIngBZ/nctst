@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/PIngBZ/nctst"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 type ProxyType int
@@ -25,22 +25,27 @@ func GetProxyList(proxyFile *ProxyFile, pingTarget *PingTarget, key, userName, p
 		return 0, nil, ""
 	}
 
+	if proxyGroups == nil {
+		return 0, nil, ""
+	}
+
 	return proxyGroups.ClientTotalSelect, SelectProxyFromGroupsInfo(proxyGroups, pingTarget), proxyGroups.Version
 }
 
 func GetProxyListFromNet(proxyFile *ProxyFile, key, userName, password string) *ProxyGroups {
 	log.Printf("**Request proxy list from %s ...", proxyFile.Url)
 
-	req, err := http.NewRequest("GET", proxyFile.Url, nil)
+	req, err := retryablehttp.NewRequest("GET", proxyFile.Url, nil)
 	if err != nil {
 		log.Printf("GetProxyListFromNet create request %s %+v\n", proxyFile.Url, err)
 		return nil
 	}
 	req.SetBasicAuth(userName, password)
 
-	client := &http.Client{
-		Timeout: time.Second * 15,
-	}
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Second * 15
+	client.RetryMax = 3
+
 	response, err := client.Do(req)
 	if err != nil {
 		log.Printf("GetProxyListFromNet do request %s %+v\n", proxyFile.Url, err)
@@ -125,10 +130,10 @@ func SelectProxyFromGroupsInfo(proxyGroups *ProxyGroups, pingTarget *PingTarget)
 func PingSelectProxyFromList(input []*ProxyInfo, num int, pingTarget *PingTarget, printDetails bool) []*ProxyInfo {
 	workChan := make(chan *ProxyInfo, len(input))
 	pingResultChan := make(chan *ProxyInfo, len(input))
-
 	for _, proxy := range input {
 		workChan <- proxy
 	}
+	close(workChan)
 
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(len(input))
@@ -138,13 +143,10 @@ func PingSelectProxyFromList(input []*ProxyInfo, num int, pingTarget *PingTarget
 	}
 	for i := 0; i < pingTarget.PingThreads; i++ {
 		go func() {
-			for {
-				work, ok := <-workChan
-				if ok {
-					client := NewProxyClient(work, pingTarget.Target)
-					if client.Ping(client, printDetails, nil) {
-						pingResultChan <- work
-					}
+			for work := range workChan {
+				client := NewProxyClient(work, pingTarget.Target)
+				if client.Ping(client, true, nil) {
+					pingResultChan <- work
 				}
 				waitGroup.Done()
 			}

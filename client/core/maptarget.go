@@ -17,6 +17,10 @@ var (
 )
 
 func startMapTargetsLoop(smuxClient *smux.Session, targets []*nctst.AddrInfo) {
+	if len(targets) == 0 {
+		return
+	}
+
 	port := 2000 + rand.Intn(3000)
 	log.Printf("\n\n++++++++++Preparing map local port to remote address++++++++++\n\n")
 	defer log.Print("\n\n----------map local port end----------\n\n")

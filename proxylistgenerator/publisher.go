@@ -9,11 +9,11 @@ import (
 	"io"
 	"log"
 	"math/rand"
-	"net/http"
 	"time"
 
 	"github.com/PIngBZ/nctst"
 	"github.com/PIngBZ/nctst/proxyclient"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 var (
@@ -64,14 +64,14 @@ func main() {
 	nctst.Xor(buf, []byte(config.Key))
 	nctst.Xor(buf, []byte(config.UserName))
 
-	client := &http.Client{
-		Timeout: time.Second * time.Duration(config.PublishTimeout),
-	}
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Second * time.Duration(config.PublishTimeout)
+	client.RetryMax = config.PublishRetry
 
 	url := fmt.Sprintf("http://%s/updateProxylist", config.PublishServer.Address())
 	buffer := bytes.NewBuffer([]byte{})
 	nctst.WriteLData(buffer, buf)
-	req, err := http.NewRequest("POST", url, buffer)
+	req, err := retryablehttp.NewRequest("POST", url, buffer)
 	if err != nil {
 		log.Printf("NewRequest %+v\n", err)
 		return

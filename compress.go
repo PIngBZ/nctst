@@ -47,8 +47,10 @@ func (c *CompStream) WriteBuffers(v [][]byte) (n int, err error) {
 		return 0, io.ErrClosedPipe
 	}
 
-	c.l.Lock()
-	defer c.l.Unlock()
+	if c.n.Load() > 0 {
+		c.l.Lock()
+		defer c.l.Unlock()
+	}
 
 	var total int
 	for _, vv := range v {
@@ -57,8 +59,8 @@ func (c *CompStream) WriteBuffers(v [][]byte) (n int, err error) {
 		}
 		n := len(vv)
 		total += n
-		c.n.Add(int32(n))
 	}
+	c.n.Add(int32(total))
 	return total, err
 }
 
@@ -86,7 +88,7 @@ func (c *CompStream) IsClosed() bool {
 }
 
 func (c *CompStream) daemon() {
-	ticker := time.NewTicker(time.Millisecond * 15)
+	ticker := time.NewTicker(time.Millisecond * 10)
 	for {
 		select {
 		case <-c.die:

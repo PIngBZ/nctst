@@ -18,6 +18,7 @@ type Config struct {
 	PingThreadNum     int             `json:"pingthreadnum"`
 	PublishServer     *nctst.AddrInfo `json:"publishserver"`
 	PublishTimeout    int             `json:"publishtimeout"`
+	PublishRetry      int             `json:"publishretry"`
 }
 
 func parseConfig(configFile string) (*Config, error) {

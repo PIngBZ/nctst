@@ -109,6 +109,10 @@ func Start(cfg *Config, code int) error {
 	}()
 
 	Status.setStat(ClientStatusStep_CheckingConnection)
+
+	CheckConnection() // ignore first request
+	time.Sleep(time.Second)
+
 	err, delay := CheckConnection()
 	if err != nil {
 		return fmt.Errorf("CheckConnection %+v", err)
@@ -207,7 +211,7 @@ func CheckConnection() (error, int) {
 				return url.Parse(proxy)
 			},
 		},
-		Timeout: time.Second * 10,
+		Timeout: time.Second * 15,
 	}
 
 	start := time.Now().UnixNano()

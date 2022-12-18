@@ -6,7 +6,6 @@ import (
 	"image/color"
 	"io"
 	"math/rand"
-	"net/http"
 	"strconv"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/PIngBZ/nctst"
 	"github.com/PIngBZ/nctst/client/core"
 	"github.com/PIngBZ/tun2socks/v2/engine"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 var (
@@ -86,28 +86,37 @@ func initMainWindow() {
 
 	MainWindow.SetMaster()
 
-	mainWindowVisible := true
-	MainWindow.SetCloseIntercept(func() {
-		MainWindow.Hide()
-		mainWindowVisible = false
-	})
-
 	if desk, ok := App.(desktop.App); ok {
+		mainWindowVisible := true
+
 		var showHide = "显示窗口"
 		if !mainWindowVisible {
 			showHide = "隐藏窗口"
 		}
-		m := fyne.NewMenu("nctst",
-			fyne.NewMenuItem(showHide, func() {
-				if mainWindowVisible {
-					MainWindow.Hide()
-					mainWindowVisible = false
-				} else {
-					MainWindow.Show()
-					mainWindowVisible = true
-				}
-			}))
-		desk.SetSystemTrayMenu(m)
+
+		item := fyne.NewMenuItem(showHide, nil)
+		menu := fyne.NewMenu("nctst", item)
+
+		item.Action = func() {
+			if mainWindowVisible {
+				MainWindow.Hide()
+				mainWindowVisible = false
+				item.Label = "显示窗口"
+			} else {
+				MainWindow.Show()
+				mainWindowVisible = true
+				item.Label = "隐藏窗口"
+			}
+			menu.Refresh()
+		}
+		desk.SetSystemTrayMenu(menu)
+
+		MainWindow.SetCloseIntercept(func() {
+			MainWindow.Hide()
+			mainWindowVisible = false
+			item.Label = "显示窗口"
+			menu.Refresh()
+		})
 	}
 
 	infoView := widget.NewRichTextWithText("启动")
@@ -165,12 +174,12 @@ func showInputCode(success func(int)) {
 }
 
 func checkCode(code int) error {
-	client := &http.Client{
-		Timeout: time.Second * 5,
-	}
+	client := retryablehttp.NewClient()
+	client.HTTPClient.Timeout = time.Second * 15
+	client.RetryMax = 3
 
 	url := "http://" + config.Manager.Address() + "/checkcode?code=" + strconv.Itoa(code)
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := retryablehttp.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
@@ -237,7 +246,11 @@ func startTunDevice() {
 
 	engine.Insert(key)
 
-	engine.Start()
+	if err := engine.Start(); err != nil {
+		showErrorDlg(err, func() {
+			App.Quit()
+		})
+	}
 }
 
 func daemon(observer chan *core.ClientStatus, text *widget.RichText) {

@@ -40,7 +40,7 @@ func (h *UserManager) daemon() {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
-	r.Use(middleware.Timeout(10 * time.Second))
+	r.Use(middleware.Timeout(30 * time.Second))
 	r.Use(h.basicAuth)
 
 	r.Get("/initdev", h.httpInitAuthDevice)

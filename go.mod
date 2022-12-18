@@ -5,7 +5,7 @@ go 1.18
 require (
 	fyne.io/fyne/v2 v2.2.4
 	github.com/PIngBZ/socks5 v0.0.9
-	github.com/PIngBZ/tun2socks/v2 v2.0.0-20221123075714-59ec68a03889
+	github.com/PIngBZ/tun2socks/v2 v2.0.0-20221218105641-f08b0b48d495
 	github.com/deckarep/golang-set/v2 v2.1.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/go-chi/chi v1.5.4
@@ -13,6 +13,7 @@ require (
 	github.com/go-chi/render v1.0.2
 	github.com/golang/snappy v0.0.4
 	github.com/google/uuid v1.3.0
+	github.com/hashicorp/go-retryablehttp v0.7.1
 	github.com/mattn/go-sqlite3 v1.14.15
 	github.com/pkg/errors v0.9.1
 	github.com/sun8911879/shadowsocksR v0.0.0-20200921031217-b0d026c7a535
@@ -45,6 +46,7 @@ require (
 	github.com/google/btree v1.1.2 // indirect
 	github.com/gopherjs/gopherjs v1.17.2 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
+	github.com/hashicorp/go-cleanhttp v0.5.1 // indirect
 	github.com/jsummers/gobmp v0.0.0-20151104160322-e2ba15ffa76e // indirect
 	github.com/klauspost/cpuid/v2 v2.0.14 // indirect
 	github.com/klauspost/reedsolomon v1.10.0 // indirect

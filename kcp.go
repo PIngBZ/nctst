@@ -42,10 +42,10 @@ func NewKcp(connID uint) *Kcp {
 
 	h.session.SetStreamMode(true)
 	h.session.SetWriteDelay(false)
-	h.session.SetNoDelay(1, 10, 0, 1)
-	h.session.SetWindowSize(64, 64)
-	h.session.SetMtu(1024 * 8)
+	h.session.SetNoDelay(1, 5, 0, 1)
+	h.session.SetWindowSize(10240, 10240)
 	h.session.SetACKNoDelay(true)
+	h.session.SetMtu(470)
 
 	h.InputChan = make(chan *BufItem, KCP_UDP_RECEIVE_BUF_NUM)
 	h.OutputChan = make(chan *BufItem, KCP_UDP_SEND_BUF_NUM)
@@ -106,9 +106,9 @@ func (h *Kcp) ReadFrom(p []byte) (n int, addr net.Addr, err error) {
 		h.receivedPackages1[idx] = true
 		h.receivedPackages2[idx] = true
 		h.receivePackageTimes++
-		if h.receivePackageTimes == 100 {
+		if h.receivePackageTimes == 200 {
 			h.receivedPackages1 = make(map[uint32]bool)
-		} else if h.receivePackageTimes == 200 {
+		} else if h.receivePackageTimes == 400 {
 			h.receivedPackages2 = make(map[uint32]bool)
 			h.receivePackageTimes = 0
 		}

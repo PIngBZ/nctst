@@ -12,7 +12,7 @@
         "port": 9000
     },
     "proxyfile": {
-        "_Remark": "type: file/net(url: x.x.x.x:xxx)",
+        "_Remark": "type: file/net(url: http://x.x.x.x:xxx)",
         "type": "file",
         "url": "list.json",
         "key": "",

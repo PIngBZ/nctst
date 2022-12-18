@@ -35,7 +35,7 @@ func (h *Socks5Client) Connect() error {
 	client := socks5.Client{
 		ProxyAddr:        h.Server.Address(),
 		DialTimeout:      time.Second * 2,
-		HandshakeTimeout: time.Second * 2,
+		HandshakeTimeout: time.Second * 5,
 		Auth:             auth,
 	}
 

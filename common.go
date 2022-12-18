@@ -12,14 +12,13 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"net/http"
 	"os"
 	"runtime/debug"
 	"strconv"
 	"sync/atomic"
 	"time"
 
-	"github.com/xtaci/smux"
+	"github.com/hashicorp/go-retryablehttp"
 )
 
 var (
@@ -59,20 +58,6 @@ func OpenLog() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 }
 
-func SmuxConfig() *smux.Config {
-	smuxConfig := smux.DefaultConfig()
-	smuxConfig.Version = 1
-	smuxConfig.MaxFrameSize = 1024 * 4
-	smuxConfig.MaxReceiveBuffer = 1024 * 1024 * 8
-	smuxConfig.KeepAliveInterval = time.Second * 30
-	smuxConfig.KeepAliveTimeout = time.Hour * 24 * 30
-
-	err := smux.VerifyConfig(smuxConfig)
-	CheckError(err)
-
-	return smuxConfig
-}
-
 var _copy_buf_pool = NewPool(1024 * 512)
 
 func Transfer(p1, p2 io.ReadWriteCloser) {
@@ -87,7 +72,11 @@ func TransferWithCounter(p1, p2 io.ReadWriteCloser, wl1, wl2 *atomic.Int64) {
 		buf := _copy_buf_pool.Get()
 		defer buf.Release()
 
-		CopyBufferWithCounter(to, from, buf.data, l)
+		if l == nil {
+			io.CopyBuffer(to, from, buf.data)
+		} else {
+			CopyBufferWithCounter(to, from, buf.data, l)
+		}
 	}
 
 	go streamCopy(p1, p2, wl1)
@@ -317,8 +306,10 @@ func SplitHostPort(addr string) (string, int, error) {
 	return host, port, nil
 }
 
-func HttpGetString(url string) (string, error) {
-	resp, err := http.Get(url)
+func HttpGetString(url string, retry int) (string, error) {
+	client := retryablehttp.NewClient()
+	client.RetryMax = retry
+	resp, err := client.Get(url)
 	if err != nil {
 		return "", err
 	}

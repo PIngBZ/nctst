@@ -57,7 +57,7 @@ func (h *Duplicater) daemon() {
 
 			item.SetMetaData(item.Size())
 		out:
-			for item.Size() < 512 {
+			for item.Size() < 256 {
 				select {
 				case next := <-h.input:
 					item.AppendItem(next)
@@ -81,6 +81,12 @@ func (h *Duplicater) daemon() {
 						cp = item.Copy()
 					}
 					sent = true
+				case <-h.die:
+					cp.Release()
+					if item != nil {
+						item.Release()
+					}
+					return
 				default:
 				}
 			}
@@ -109,6 +115,6 @@ func (h *Duplicater) updateTunnelsList() {
 	v, t := h.tunnelsListCallback(h.tunnelsListVer)
 	if t != nil {
 		h.tunnels = t
+		h.tunnelsListVer = v
 	}
-	h.tunnelsListVer = v
 }
