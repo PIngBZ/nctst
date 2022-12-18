@@ -58,7 +58,7 @@ func (h *ProxyListManager) requestProxyList() (error, bool) {
 		return errors.New("GetProxyList return empty"), false
 	}
 
-	if config.ProxyFile.Type == "net" && version == h.version {
+	if len(h.version) != 0 && version == h.version {
 		return errors.New("no new version proxy list"), false
 	}
 
